@@ -28,7 +28,7 @@ Drizzle ORM
 Modular monolith
 3-layer by default
 Selective domain modeling for heavy modules
-Shared TypeScript contracts where useful
+OpenAPI-generated client/types for frontend API usage
 ```
 
 ## 3. Core Documents

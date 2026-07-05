@@ -311,7 +311,11 @@ Avoid:
 
 ## 10. API Contract Rule
 
-Frontend should consume generated TypeScript clients/types from OpenAPI or a shared contracts package.
+Frontend should consume generated TypeScript clients/types from OpenAPI.
+
+NestJS DTO classes are the source of truth for REST request/response contracts.
+
+Do not create a shared request/response contracts package for normal REST APIs.
 
 Do not share backend domain objects with frontend.
 

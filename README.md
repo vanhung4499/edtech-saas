@@ -25,7 +25,6 @@ apps/
   worker/
 
 packages/
-  contracts/
   database/
   shared/
   ui/

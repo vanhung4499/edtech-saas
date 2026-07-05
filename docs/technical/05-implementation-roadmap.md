@@ -220,7 +220,7 @@ Next.js + NestJS monorepo skeleton
 system module baseline
 PostgreSQL + Drizzle migrations
 login + RBAC + data scope
-OpenAPI/shared contract
+OpenAPI-generated frontend client/types
 ```
 
 Everything else should build on that.

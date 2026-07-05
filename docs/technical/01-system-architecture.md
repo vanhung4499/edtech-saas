@@ -21,7 +21,7 @@ NestJS is the better fit for the current product strategy because the project is
 
 - same language across frontend and backend
 - easier fullstack refactoring
-- shared TypeScript contracts where useful
+- OpenAPI-generated frontend client/types from NestJS DTOs
 - faster iteration while business scope is still being validated
 - lighter compute profile during MVP stage
 
@@ -77,7 +77,7 @@ Examples:
 - audit support
 - file storage adapter
 - queue/job support
-- shared contracts
+- generated API client/types
 - shared UI primitives
 
 This layer should contain technical capabilities, not product business workflows.
@@ -146,31 +146,31 @@ This means:
 
 Recommended backend stack:
 
-| Area                      | Decision                                                      |
-| ------------------------- | ------------------------------------------------------------- |
-| Runtime                   | Node.js LTS                                                   |
-| Framework                 | NestJS                                                        |
-| Database                  | PostgreSQL                                                    |
-| Persistence               | Drizzle ORM                                                   |
-| Migration                 | Drizzle migrations                                            |
-| API contract              | REST + OpenAPI, plus shared TypeScript contracts where useful |
-| Auth                      | app-owned RBAC/data scope                                     |
-| Cache / lightweight queue | Redis                                                         |
-| Jobs                      | BullMQ when background jobs become necessary                  |
-| File storage              | S3-compatible storage                                         |
+| Area                      | Decision                                                    |
+| ------------------------- | ----------------------------------------------------------- |
+| Runtime                   | Node.js LTS                                                 |
+| Framework                 | NestJS                                                      |
+| Database                  | PostgreSQL                                                  |
+| Persistence               | Drizzle ORM                                                 |
+| Migration                 | Drizzle migrations                                          |
+| API contract              | REST + NestJS DTO + OpenAPI-generated frontend client/types |
+| Auth                      | app-owned RBAC/data scope                                   |
+| Cache / lightweight queue | Redis                                                       |
+| Jobs                      | BullMQ when background jobs become necessary                |
+| File storage              | S3-compatible storage                                       |
 
 ## 7. Frontend Stack
 
 Recommended frontend stack:
 
-| Area         | Decision                                          |
-| ------------ | ------------------------------------------------- |
-| Framework    | Next.js / React                                   |
-| Language     | TypeScript                                        |
-| API contract | generated from OpenAPI or shared contract package |
-| UI purpose   | operator SaaS, not marketing-first UI             |
+| Area         | Decision                              |
+| ------------ | ------------------------------------- |
+| Framework    | Next.js / React                       |
+| Language     | TypeScript                            |
+| API contract | generated from OpenAPI                |
+| UI purpose   | operator SaaS, not marketing-first UI |
 
-Frontend and backend may share request/response contracts, validation schemas, and enums.
+Frontend should consume generated request/response types from the backend OpenAPI schema.
 
 They should not share backend domain objects as UI models.
 

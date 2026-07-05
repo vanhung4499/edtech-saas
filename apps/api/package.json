@@ -12,7 +12,6 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@edtech/contracts": "workspace:*",
     "@edtech/database": "workspace:*",
     "@edtech/shared": "workspace:*",
     "@nestjs/common": "latest",
@@ -22,8 +21,7 @@
     "drizzle-orm": "latest",
     "pg": "latest",
     "reflect-metadata": "latest",
-    "rxjs": "latest",
-    "zod": "latest"
+    "rxjs": "latest"
   },
   "devDependencies": {
     "@nestjs/cli": "latest",
