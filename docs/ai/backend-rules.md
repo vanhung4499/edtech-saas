@@ -72,6 +72,13 @@ Request -> Command -> Domain Object / Policy -> Row Snapshot -> Repository -> DB
 - Keep error codes short and readable, for example `USER_NOT_FOUND`.
 - Define module-specific error codes inside the module when needed.
 
+## Config Rules
+
+- Use NestJS `ConfigModule` for API runtime config.
+- Do not read `process.env` directly inside modules.
+- Add API env validation in `apps/api/src/config/server-env.ts`.
+- Keep `.env.example` in sync with required env values.
+
 ## Event Rules
 
 Use internal events only for downstream reactions:

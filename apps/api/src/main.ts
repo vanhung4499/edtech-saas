@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { AppExceptionFilter } from "./common/exceptions/app-exception.filter";
@@ -7,12 +8,17 @@ import { setupOpenApi } from "./common/openapi/setup-openapi";
 import { createValidationException } from "./common/pipes/validation-exception.factory";
 import { requestIdMiddleware } from "./common/request/request-id.middleware";
 import { ResultInterceptor } from "./common/result/result.interceptor";
+import type { ServerEnv } from "./config/server-env";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const config = app.get<ConfigService<ServerEnv, true>>(ConfigService);
+  const appUrl = config.get("APP_URL", { infer: true });
+  const port = config.get("PORT", { infer: true });
+
   app.setGlobalPrefix("api");
   app.enableCors({
-    origin: process.env.APP_URL ?? "http://localhost:3000",
+    origin: appUrl,
     credentials: true,
   });
   app.use(requestIdMiddleware);
@@ -27,7 +33,7 @@ async function bootstrap() {
   app.useGlobalFilters(new AppExceptionFilter());
   app.useGlobalInterceptors(new ResultInterceptor());
   setupOpenApi(app);
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3001);
+  await app.listen(port);
 }
 
 void bootstrap();

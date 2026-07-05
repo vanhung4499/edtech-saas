@@ -435,3 +435,26 @@ OpenAPI JSON:
 ```txt
 /api/openapi.json
 ```
+
+## 15. Configuration Rule
+
+The API uses NestJS `ConfigModule` as a global module.
+
+Rules:
+
+1. Do not read `process.env` directly in feature modules.
+2. Add API runtime env variables to `apps/api/src/config/server-env.ts`.
+3. Keep `.env.example` updated whenever a required env variable is added.
+4. Commit `.env.example`, but never commit real `.env` files.
+5. Read config values through `ConfigService<ServerEnv, true>`.
+
+Local env files are loaded from:
+
+```txt
+../../.env.local
+../../.env
+.env.local
+.env
+```
+
+This allows running the API from either the repo root or the app folder.

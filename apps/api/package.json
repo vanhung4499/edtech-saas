@@ -23,7 +23,8 @@
     "drizzle-orm": "latest",
     "pg": "latest",
     "reflect-metadata": "latest",
-    "rxjs": "latest"
+    "rxjs": "latest",
+    "zod": "latest"
   },
   "devDependencies": {
     "@nestjs/cli": "latest",

@@ -38,6 +38,8 @@ pnpm install
 pnpm dev
 ```
 
+Create a local `.env` from `.env.example` before running the API.
+
 Local infrastructure:
 
 ```bash
