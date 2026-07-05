@@ -1,5 +1,5 @@
 import { HttpException, type HttpStatus } from "@nestjs/common";
-import type { ResultBody } from "../result/result.js";
+import type { ResultBody } from "../result/result";
 
 export interface AppExceptionOptions<TData = unknown> {
   code: string;

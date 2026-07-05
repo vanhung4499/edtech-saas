@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus } from "@nestjs/common";
-import type { ResultBody } from "../result/result.js";
-import { AppException } from "./app.exception.js";
+import type { ResultBody } from "../result/result";
+import { AppException } from "./app.exception";
 
 export interface NormalizedException {
   status: number;

@@ -1,7 +1,7 @@
 import { BadRequestException, HttpStatus, NotFoundException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
-import { AppException } from "./app.exception.js";
-import { normalizeException } from "./exception-normalizer.js";
+import { AppException } from "./app.exception";
+import { normalizeException } from "./exception-normalizer";
 
 describe("AppException", () => {
   it("keeps business code, message, status, and data", () => {

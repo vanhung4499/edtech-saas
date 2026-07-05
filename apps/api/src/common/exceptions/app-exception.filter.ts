@@ -1,5 +1,5 @@
 import { Catch, type ArgumentsHost, type ExceptionFilter } from "@nestjs/common";
-import { normalizeException } from "./exception-normalizer.js";
+import { normalizeException } from "./exception-normalizer";
 
 interface HttpResponseLike {
   status: (statusCode: number) => {

@@ -1,6 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import { ApiProperty, ApiTags } from "@nestjs/swagger";
-import { ApiResult } from "./common/result/swagger-result.js";
+import { ApiResult } from "./common/result/swagger-result";
 
 class HealthResponse {
   @ApiProperty({ example: "ok" })

@@ -1,6 +1,6 @@
 import type { ValidationError } from "class-validator";
 import { describe, expect, it } from "vitest";
-import { createValidationException } from "./validation-exception.factory.js";
+import { createValidationException } from "./validation-exception.factory";
 
 describe("createValidationException", () => {
   it("converts class-validator errors to AppException field details", () => {

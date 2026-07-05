@@ -1,6 +1,6 @@
 import { HttpStatus } from "@nestjs/common";
 import type { ValidationError } from "class-validator";
-import { AppException } from "../exceptions/app.exception.js";
+import { AppException } from "../exceptions/app.exception";
 
 interface ValidationFieldError {
   field: string;

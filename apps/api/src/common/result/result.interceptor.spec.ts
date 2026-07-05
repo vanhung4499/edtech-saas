@@ -1,7 +1,7 @@
 import type { CallHandler, ExecutionContext } from "@nestjs/common";
 import { lastValueFrom, of } from "rxjs";
 import { describe, expect, it } from "vitest";
-import { ResultInterceptor } from "./result.interceptor.js";
+import { ResultInterceptor } from "./result.interceptor";
 
 function createContext(traceId = "req-test"): ExecutionContext {
   return {

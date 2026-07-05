@@ -1,6 +1,6 @@
 import { applyDecorators, type Type } from "@nestjs/common";
 import { ApiExtraModels, ApiOkResponse, ApiProperty, getSchemaPath } from "@nestjs/swagger";
-import { RESULT_SUCCESS_CODE, RESULT_SUCCESS_MESSAGE } from "./result.js";
+import { RESULT_SUCCESS_CODE, RESULT_SUCCESS_MESSAGE } from "./result";
 
 export class ResultDto<TData = unknown> {
   @ApiProperty({ example: RESULT_SUCCESS_CODE })

@@ -10,7 +10,7 @@ import {
   RESULT_SUCCESS_MESSAGE,
   isResultBody,
   type ResultEnvelope,
-} from "./result.js";
+} from "./result";
 
 @Injectable()
 export class ResultInterceptor implements NestInterceptor {
