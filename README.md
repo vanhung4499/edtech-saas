@@ -51,4 +51,5 @@ API docs:
 ```txt
 http://localhost:3001/api/docs
 http://localhost:3001/api/openapi.json
+http://localhost:3001/api/v1/health
 ```

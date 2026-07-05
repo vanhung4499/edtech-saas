@@ -7,7 +7,6 @@ export function setupOpenApi(app: INestApplication) {
     .setDescription("Operator API for Vietnam-focused education center SaaS.")
     .setVersion("0.1.0")
     .addBearerAuth()
-    .addServer("/api")
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

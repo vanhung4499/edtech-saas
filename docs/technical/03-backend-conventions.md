@@ -436,6 +436,14 @@ OpenAPI JSON:
 /api/openapi.json
 ```
 
+API routes use URI versioning.
+
+Phase 1 routes should live under:
+
+```txt
+/api/v1
+```
+
 ## 15. Configuration Rule
 
 The API uses NestJS `ConfigModule` as a global module.
