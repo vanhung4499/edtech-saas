@@ -62,6 +62,16 @@ Request -> Command -> Domain Object / Policy -> Row Snapshot -> Repository -> DB
 - Do not call slow external providers inside transactions.
 - Publish downstream events only after commit when possible.
 
+## API Rules
+
+- NestJS DTO classes are the REST API source of truth.
+- Use Swagger decorators on request/response DTOs.
+- Return normal controller data directly; the global `ResultInterceptor` wraps it as `{ code, message, data, traceId }`.
+- Use `AppException` for business/application errors.
+- Built-in NestJS exceptions are allowed for generic HTTP errors.
+- Keep error codes short and readable, for example `USER_NOT_FOUND`.
+- Define module-specific error codes inside the module when needed.
+
 ## Event Rules
 
 Use internal events only for downstream reactions:

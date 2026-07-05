@@ -43,3 +43,10 @@ Local infrastructure:
 ```bash
 docker compose up -d
 ```
+
+API docs:
+
+```txt
+http://localhost:3001/api/docs
+http://localhost:3001/api/openapi.json
+```

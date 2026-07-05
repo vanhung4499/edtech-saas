@@ -324,3 +324,114 @@ API contracts are separate from:
 - domain objects
 - Drizzle rows
 - database schema
+
+## 11. Result Rule
+
+All normal API responses are wrapped by the global `ResultInterceptor`:
+
+```json
+{
+  "code": "SUCCESS",
+  "message": "Success",
+  "data": {},
+  "traceId": "request-id"
+}
+```
+
+Controllers should return business data directly in most cases.
+
+If a use case needs a custom success code/message, return a `ResultBody`-shaped object:
+
+```ts
+return {
+  code: "TENANT_CREATED",
+  message: "Tenant created",
+  data: tenant,
+};
+```
+
+Do not return Drizzle rows directly as public response data.
+
+## 12. Exception Rule
+
+Use `AppException` for application/business errors.
+
+Examples:
+
+```ts
+throw AppException.notFound("USER_NOT_FOUND", "User not found");
+throw AppException.conflict("ENROLLMENT_ALREADY_ACTIVE", "Enrollment already active");
+```
+
+Rules:
+
+1. Error codes should be short and human-readable, such as `USER_NOT_FOUND`.
+2. Do not create one global enum containing every module error code.
+3. Each module may define its own local error-code file when it has enough errors.
+4. `AppException` must carry the correct HTTP status.
+5. Built-in NestJS exceptions are allowed for generic HTTP errors.
+6. The global exception filter wraps both `AppException` and NestJS exceptions into the same response shape.
+
+Error response shape:
+
+```json
+{
+  "code": "USER_NOT_FOUND",
+  "message": "User not found",
+  "data": null,
+  "traceId": "request-id"
+}
+```
+
+Validation errors use:
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "Validation failed",
+  "data": {
+    "fields": [{ "field": "email", "message": "email must be an email" }]
+  },
+  "traceId": "request-id"
+}
+```
+
+## 13. Trace ID Rule
+
+Every request has a `traceId`.
+
+The API reads `x-request-id` when provided. Otherwise, it generates a new id and returns it in both the `x-request-id` response header and response body.
+
+Use `traceId` for support/debugging:
+
+- user reports an error
+- frontend sends the trace id to support
+- backend logs can later be searched by the same id
+
+This is intentionally lightweight. Do not introduce a full observability stack in phase 1.
+
+## 14. DTO and OpenAPI Rule
+
+NestJS DTO classes are the source of truth for REST request/response contracts.
+
+Use:
+
+- `*.request.ts` for request/query/param/body DTOs
+- `*.response.ts` for response DTOs
+- `class-validator` for validation
+- `class-transformer` for query/body transformation
+- Swagger decorators for OpenAPI schema
+
+Common DTOs live under `apps/api/src/common/dto`.
+
+Swagger UI:
+
+```txt
+/api/docs
+```
+
+OpenAPI JSON:
+
+```txt
+/api/openapi.json
+```

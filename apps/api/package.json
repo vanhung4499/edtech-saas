@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests src"
   },
   "dependencies": {
     "@edtech/database": "workspace:*",
@@ -18,6 +18,9 @@
     "@nestjs/config": "latest",
     "@nestjs/core": "latest",
     "@nestjs/platform-express": "latest",
+    "@nestjs/swagger": "latest",
+    "class-transformer": "latest",
+    "class-validator": "latest",
     "drizzle-orm": "latest",
     "pg": "latest",
     "reflect-metadata": "latest",
