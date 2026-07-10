@@ -3,7 +3,7 @@
 | Field      | Value                                                                                                                                                                           |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status     | Draft for review                                                                                                                                                                |
-| Date       | 2026-07-04                                                                                                                                                                      |
+| Date       | 2026-07-06                                                                                                                                                                      |
 | Scope      | Academic / teaching-center business rules                                                                                                                                       |
 | Depends on | `docs/business/academic-business-architecture.md`, `docs/business/academic-context-map.md`, `docs/business/academic-business-objects.md`, `docs/business/academic-workflows.md` |
 
@@ -59,6 +59,27 @@ The rules are grouped into these categories:
 - `Rule`: classes, rooms, staff activity, learner operations, payments, and costs may need branch attribution.
 - `Why`: branch-level control is central to many education center operating models in Vietnam.
 - `Impacted contexts`: `Academic Delivery`, `Scheduling & Resources`, `Finance`, `Reporting & Control`
+
+## Rule A4: Product modules are enabled per tenant
+
+- `Category`: Access and organizational
+- `Rule`: each tenant has an explicit set of enabled product modules; features of a disabled module must be invisible and inactive for that tenant.
+- `Why`: the commercial strategy is modular selling — center management now, study abroad, labor export, or LMS later, purchased separately.
+- `Impacted contexts`: `Identity & Organization Core`, all product contexts
+
+## Rule A5: Person identity is not keyed by contact info
+
+- `Category`: Access and organizational
+- `Rule`: phone numbers and other contact info may legitimately repeat across persons (a guardian's phone attached to several children) and must never be a hard uniqueness key for `Person`. Guardians are their own `Person` holding their own contact info, linked to learners via guardian relationships — do not stuff a parent's phone into the learner record.
+- `Why`: shared family phones are the norm in Vietnam; hard-unique phone constraints force data corruption at the front desk.
+- `Impacted contexts`: `Identity & Organization Core`, `Admissions`, `Academic Delivery`
+
+## Rule A6: Person duplicate handling is assist-and-merge, not prevent
+
+- `Category`: Access and organizational
+- `Rule`: person creation runs a soft duplicate check (normalized name + date of birth, shared contact info) that warns with candidates but never blocks. Person merge is a first-class audited operation: pick a survivor, re-point all references, keep the merged record as a tombstone pointing to the survivor. Every module that references a person must register its referencing columns so merge can re-point them.
+- `Why`: duplicates will happen (two receptionists, one child); two real people can share name and birth date, so hard blocking is wrong — the platform needs detection plus a safe merge.
+- `Impacted contexts`: `Identity & Organization Core`, all contexts referencing persons
 
 ## 4. Admissions and Enrollment Rules
 
@@ -178,6 +199,13 @@ The rules are grouped into these categories:
 - `Why`: exceptions can affect attendance, teaching load, and settlement.
 - `Impacted contexts`: `Scheduling & Resources`, `Academic Delivery`, `Finance`
 
+## Rule S6: Session occurrence and attendance are recorded facts
+
+- `Category`: Scheduling and resource
+- `Rule`: whether a session actually ran and who actually taught it is owned by `Scheduling & Resources`; which learners were actually present is owned by `Academic Delivery`. Both are first-class recorded facts, not informal notes.
+- `Why`: per-session pricing, teacher settlement, guardian communication, and future learning-delivery features all depend on these facts.
+- `Impacted contexts`: `Scheduling & Resources`, `Academic Delivery`, `Finance`
+
 ## 7. Financial Rules
 
 ## Rule F1: Finance is broader than billing
@@ -190,7 +218,7 @@ The rules are grouped into these categories:
 ## Rule F2: Learner financial commitment is determined at the enrollment level
 
 - `Category`: Financial
-- `Rule`: final financial commitment for a learner is determined by `Enrollment Financial Terms`, not by program default alone.
+- `Rule`: final financial commitment for a learner is determined by `Financial Terms`, not by program default alone.
 - `Why`: different learners in the same class may owe different amounts or schedules.
 - `Impacted contexts`: `Finance`, `Academic Delivery`
 
@@ -221,6 +249,13 @@ The rules are grouped into these categories:
 - `Rule`: money owed by learners and money owed by the center to other parties must not collapse into one undifferentiated obligation bucket.
 - `Why`: their lifecycle, reporting, and business ownership differ.
 - `Impacted contexts`: `Finance`
+
+## Rule F7: Finance money records are origin-agnostic
+
+- `Category`: Financial
+- `Rule`: receivable, payment, allocation, and invoice records reference their business origin through a `Charge Basis`, never through structural dependence on one product module's records. Each product module brings its own financial-terms concept, which produces charge bases.
+- `Why`: adding study abroad, labor export, or LMS must not require modifying core finance structures.
+- `Impacted contexts`: `Finance`, all product contexts
 
 ## 8. Payment and Invoice Rules
 
@@ -272,6 +307,13 @@ The rules are grouped into these categories:
 - `Rule`: the early platform must support these methods as first-class payment channels.
 - `Why`: they fit real center operations in Vietnam.
 - `Impacted contexts`: `Finance`
+
+## Rule P8: A payment transaction belongs to the paying party
+
+- `Category`: Payment and invoice
+- `Rule`: a payment transaction is attached to the party who actually paid (often a guardian), and allocation connects it to receivables — including receivables of multiple learners.
+- `Why`: one guardian transfer commonly covers tuition for several children; the model must support this without contortion.
+- `Impacted contexts`: `Finance`, `Identity & Organization Core`
 
 ## 9. Teacher Settlement Rules
 
@@ -333,13 +375,18 @@ The following rules are the most critical to preserve when moving into technical
 1. `Tenant` separation is absolute.
 2. `Role` and `Data Scope` are separate.
 3. `Program` and `Class` are separate.
-4. `Enrollment` and `Enrollment Financial Terms` are separate.
+4. `Enrollment` and `Financial Terms` are separate.
 5. `Teacher Assignment` and `Teacher Commercial Terms` are separate.
 6. `Billing`, `Payment`, and `Invoice` are separate.
 7. `Teacher-led` intake and compensation are first-class.
 8. `Skip-level` participation must not automatically charge skipped learning steps.
 9. `Transfer`, `Hold`, and `Re-entry` are business events, not silent edits.
 10. `Branch-specific` and `shared` financial costs must remain distinguishable.
+11. Finance records reference a `Charge Basis`, never a product module's records directly.
+12. `Payment Transaction` belongs to the paying party, not to an enrollment.
+13. `Session occurrence` and `Attendance` are recorded facts with clear owners.
+14. Product modules are enabled per tenant via `Module Entitlement`.
+15. `Person` duplicates are detected and merged, never hard-blocked by contact info.
 
 ## 12. Architectural Conclusion
 

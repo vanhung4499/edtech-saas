@@ -72,7 +72,7 @@ center-owned acquisition path.
 5. Recommend target `Program` and `Class`
 6. Apply relevant `Promotion Offer` or commercial guidance if applicable
 7. Convert prospect into `Enrollment`
-8. Create `Enrollment Financial Terms`
+8. Create `Financial Terms`
 9. Generate initial `Receivable Items`
 
 ### Business outcome
@@ -109,7 +109,7 @@ A teacher brings a learner or learner group into the center.
 3. Capture minimum intake and guardian context if relevant
 4. Assign target `Program` and `Class`
 5. Create `Enrollment`
-6. Apply `Enrollment Financial Terms`
+6. Apply `Financial Terms`
 7. Link the operational teaching context to the appropriate `Teacher Assignment`
 8. Create learner-facing `Receivable Items`
 9. Keep teacher payout logic separate for later `Teacher Settlement`
@@ -180,7 +180,7 @@ A learner is newly enrolled or academically changed in a way that affects charge
 ### Flow
 
 1. Confirm `Enrollment`
-2. Determine `Enrollment Financial Terms`
+2. Determine `Financial Terms`
 3. Apply pricing logic
 4. Apply promotions or special terms if valid
 5. Generate `Receivable Items`
@@ -288,7 +288,7 @@ A learner changes class, pauses study, resumes study, or re-enters after interru
 2. Update active `Enrollment` truth
 3. Update class roster implications
 4. Update schedule/resource impact if applicable
-5. Recalculate or adjust `Enrollment Financial Terms` if needed
+5. Recalculate or adjust `Financial Terms` if needed
 6. Create or update billing adjustments, carry-forward, or refunds if required
 
 ### Business outcome
@@ -397,7 +397,7 @@ workflows rather than many disconnected screens.
 The most important workflow boundaries are:
 
 1. `Lead/Prospect` becomes `Enrollment` only through a defined conversion.
-2. `Enrollment` becomes money only through `Enrollment Financial Terms` and billing.
+2. `Enrollment` becomes money only through `Financial Terms` and billing.
 3. `Billing` becomes collected money only through payment and reconciliation.
 4. `Billing` becomes formal documentation through invoice issuance.
 5. `Teacher Assignment` becomes payout through settlement, not directly.

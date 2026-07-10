@@ -1,132 +1,134 @@
-# System Architecture v2
+# System Architecture
 
-| Field      | Value                                                                                                      |
-| ---------- | ---------------------------------------------------------------------------------------------------------- |
-| Status     | Draft for review                                                                                           |
-| Date       | 2026-07-05                                                                                                 |
-| Scope      | Core architecture for the NestJS and Drizzle modular monolith                                              |
-| Depends on | `README.md`, `docs/business/academic-business-architecture.md`, `docs/business/competitor-landscape-vn.md` |
+| Field      | Value                                                    |
+| ---------- | -------------------------------------------------------- |
+| Status     | Active                                                   |
+| Date       | 2026-07-06                                               |
+| Scope      | Stack decisions, monorepo layout, platform layers        |
+| Depends on | `docs/business/academic-business-architecture.md`        |
 
 ## 1. Decision
 
-Use `NestJS + Drizzle + PostgreSQL` as the backend foundation.
+Build one **modular monolith**: `NestJS + Drizzle + PostgreSQL`, TypeScript
+end to end, in a pnpm + Turborepo monorepo.
 
-This is the final backend direction for now.
+This is the settled backend direction. Do not reopen it per feature.
 
-The product should be built as a modular monolith, not microservices.
+## 2. Why This Stack
 
-## 2. Why NestJS and Drizzle
+**NestJS over Spring Boot** — the project is optimized for fast fullstack delivery
+by a small team:
 
-NestJS is the better fit for the current product strategy because the project is optimized for fast fullstack delivery and AI-assisted development:
-
-- same language across frontend and backend
-- easier fullstack refactoring
-- OpenAPI-generated frontend client/types from NestJS DTOs
+- one language across web, api, worker, and shared packages
+- OpenAPI-generated frontend client/types straight from NestJS DTOs
+- lighter compute footprint during MVP
 - faster iteration while business scope is still being validated
-- lighter compute profile during MVP stage
 
-Drizzle is preferred over Prisma because this system still needs stronger persistence discipline:
+Revisit only if a JVM-only integration becomes mandatory (e.g. a provider SDK with
+no usable Node client) or the team strategy shifts to Java hiring. Neither blocks
+phase 1.
 
-- SQL-first modeling
-- clear table/schema ownership
-- less pressure to treat ORM models as domain entities
-- easier mapping between persistence rows and domain objects in heavy modules
-- good fit for finance, scheduling, and academic lifecycle rules
+**Drizzle over Prisma** — the system needs persistence discipline:
 
-The trade-off is that transaction boundaries must be handled deliberately in application/service code.
+- SQL-first modeling, explicit queries
+- no pressure to treat ORM models as domain entities
+- clean mapping from rows to domain objects in heavy modules
+- explicit transactions, which the finance domain benefits from
+
+The trade-off is deliberate transaction handling in service/application code.
+See `03-backend-conventions.md` section on transactions.
 
 ## 3. High-Level Shape
 
 ```mermaid
 flowchart TB
-    WEB[Web App: Next.js / React]
-    API[Backend: NestJS Modular Monolith]
+    WEB[apps/web: Next.js operator console]
+    API[apps/api: NestJS modular monolith]
+    WORKER[apps/worker: BullMQ jobs]
     DB[(PostgreSQL)]
     REDIS[(Redis)]
-    OBJ[(S3-compatible Object Storage)]
-    EXT[External Providers]
+    OBJ[(S3-compatible storage)]
+    EXT[External providers: e-invoice, payment]
 
-    WEB --> API
+    WEB -->|OpenAPI-generated client| API
     API --> DB
     API --> REDIS
     API --> OBJ
     API --> EXT
+    WORKER --> REDIS
+    WORKER --> DB
+    WORKER --> EXT
 ```
 
-## 4. Platform Layers
+The API and the worker are separate processes sharing `@edtech/database` and the
+same tenant-context rules (`04-tenancy-and-data-scope.md`).
 
-The product should be organized into three large levels:
+## 4. Monorepo Layout
 
 ```txt
-shared packages
-system
-business modules
+apps/
+  api/        NestJS backend (modular monolith)
+  web/        Next.js operator console
+  worker/     BullMQ background jobs
+
+packages/
+  database/   Drizzle schema, client, migrations, seed  (DB source of truth)
+  shared/     cross-cutting logic usable by web+api+worker (e.g. Money)
+  ui/         shared React components
+  config/     shared zod-based config helpers
 ```
 
-## 4.1 `shared packages`
+Rules:
 
-Reusable technical foundation.
+1. Apps depend on packages via `workspace:*`; TS path aliases live in
+   `tsconfig.base.json`.
+2. `packages/shared` must stay dependency-light and framework-free. Nothing in it
+   may import NestJS, Next.js, or Drizzle.
+3. `packages/database` is the only place schema is defined. Apps never define
+   tables.
+4. There is deliberately **no shared API-contracts package**. The web app consumes
+   generated types from the API's OpenAPI schema (`07-frontend.md`).
 
-Examples:
+Key commands (root):
 
-- common response/error model
-- auth/session helpers
-- database config
-- tenant context
-- data permission support
-- audit support
-- file storage adapter
-- queue/job support
-- generated API client/types
-- shared UI primitives
+```bash
+pnpm dev / build / lint / typecheck / test   # turbo across workspaces
+pnpm --filter @edtech/api <task>             # single workspace
+pnpm db:generate / db:migrate / db:studio / db:seed
+docker compose up -d                         # Postgres 16 + Redis 7
+```
 
-This layer should contain technical capabilities, not product business workflows.
+## 5. Platform Layers
 
-## 4.2 `system`
+Three levels, strictly ordered:
 
-Reusable SaaS admin/platform module.
+```txt
+shared packages   ->   system module   ->   business modules
+(technical)            (SaaS platform)      (product domains)
+```
 
-Examples:
+### 5.1 Shared packages
 
-- tenant
-- branch
-- user
-- role
-- permission
-- data scope
-- menu
-- config
-- dictionary
-- audit log
-- login log
-- file metadata
-- notification template
-- scheduled job metadata
+Technical capabilities only: response/error model, tenant context, db client,
+queue helpers, money, UI primitives. No product workflows.
 
-This layer should be reusable across future SaaS products.
+### 5.2 `system`
 
-It must not own education business concepts like enrollment, class, payment, invoice, or teacher settlement.
+The reusable SaaS platform base: tenant, branch, user, role, permission, data
+scope, person, config, dictionary, audit, file metadata.
 
-## 4.3 `business modules`
+It must stay reusable for future SaaS products. It must never own education
+concepts (enrollment, class, payment, invoice, settlement).
 
-Product-specific domains.
+### 5.3 Business modules
 
-Phase-1 modules:
+Phase 1: `admissions`, `academic`, `scheduling`, `finance`, `reporting`.
+Future: `study-abroad`, `labor-export` — added as sibling product modules, never
+folded into `academic`.
 
-- `admissions`
-- `academic`
-- `scheduling`
-- `finance`
-- `reporting`
+## 6. Product Module Strategy
 
-Future product modules:
-
-- `study-abroad`
-- `labor-export`
-
-## 5. Product Module Strategy
-
-The SaaS should support modular selling later:
+The SaaS must support modular selling later:
 
 ```txt
 Tenant A: Center Management only
@@ -135,75 +137,32 @@ Tenant C: Center + Study Abroad
 Tenant D: Center + Study Abroad + Labor Export
 ```
 
-This means:
+Consequences:
 
 - product modules must be separable
-- shared platform capabilities live in `system`
-- shared money capabilities live in `finance`
-- future domains must not be hidden inside `academic`
+- shared platform capability lives in `system`
+- shared money capability lives in `finance`
 
-## 6. Backend Stack
+## 7. Runtime Configuration
 
-Recommended backend stack:
+- API env is validated with zod in `apps/api/src/config/server-env.ts` and read
+  only through `ConfigService<ServerEnv, true>`. Feature modules never read
+  `process.env`.
+- Env files load from repo root or app folder: `../../.env.local`, `../../.env`,
+  `.env.local`, `.env`.
+- Two database URLs (see `04-tenancy-and-data-scope.md`):
+  - `DATABASE_URL` — runtime role (no RLS bypass), used by api and worker
+  - `DATABASE_MIGRATE_URL` — owner role, used by drizzle-kit and seed
+- `.env.example` must stay in sync with required variables.
 
-| Area                      | Decision                                                    |
-| ------------------------- | ----------------------------------------------------------- |
-| Runtime                   | Node.js LTS                                                 |
-| Framework                 | NestJS                                                      |
-| Database                  | PostgreSQL                                                  |
-| Persistence               | Drizzle ORM                                                 |
-| Migration                 | Drizzle migrations                                          |
-| API contract              | REST + NestJS DTO + OpenAPI-generated frontend client/types |
-| Auth                      | app-owned RBAC/data scope                                   |
-| Cache / lightweight queue | Redis                                                       |
-| Jobs                      | BullMQ when background jobs become necessary                |
-| File storage              | S3-compatible storage                                       |
+## 8. Non-Goals for Phase 1
 
-## 7. Frontend Stack
+Do not build:
 
-Recommended frontend stack:
-
-| Area         | Decision                              |
-| ------------ | ------------------------------------- |
-| Framework    | Next.js / React                       |
-| Language     | TypeScript                            |
-| API contract | generated from OpenAPI                |
-| UI purpose   | operator SaaS, not marketing-first UI |
-
-Frontend should consume generated request/response types from the backend OpenAPI schema.
-
-They should not share backend domain objects as UI models.
-
-## 8. Event Strategy
-
-Use events lightly.
-
-Events should be:
-
-- internal
-- post-commit
-- used for downstream reactions
-
-Good event use cases:
-
-- reporting projection refresh
-- notification
-- invoice provider sync
-- payment reconciliation job
-- export generation
-
-Do not use events to replace core transactional workflows.
-
-## 9. Non-Goals in Phase 1
-
-Do not build these in phase 1:
-
-- microservices
-- full CQRS framework
-- event-driven everything
-- plugin marketplace
-- generalized workflow engine
-- full accounting ledger
-- full study-abroad/labor-export workflow
+- microservices, full CQRS, event-driven-everything
+- plugin marketplace, generic workflow engine
+- full accounting ledger, tax engine
+- parent/mobile portal, LMS features
+- study-abroad or labor-export workflows
 
 The system should stay serious, but not theatrical.

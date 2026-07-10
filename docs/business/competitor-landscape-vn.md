@@ -284,7 +284,35 @@ But public stories rarely explain a clear shared lifecycle such as:
 
 This may become a future platform differentiation area if modeled carefully.
 
-## 8.4 Product modularity clarity
+## 8.4 Money-out (teacher payout, expenses) — scanned 2026-07-06
+
+A follow-up scan of the money-out side (teacher settlement, expenses, payables)
+found:
+
+Commonly advertised:
+
+- attendance-driven teacher payroll (e.g. Easy Edu "tự động chấm lương thông qua
+  điểm danh")
+- multiple compensation models — admin salary, per-session (`theo ca`),
+  per-hour, `% theo sĩ số` (e.g. "1–20 học viên → 30% học phí"), revenue share
+  (Eduspace lists six)
+- spending approval (`thu và chi đều được duyệt bởi kế toán hoặc admin`) and
+  per-branch financial data (MONA, CenterOnline)
+
+Weakly or not signaled (differentiation openings, consistent with 8.2):
+
+- revenue-share basis: collected vs billed revenue
+- teacher advances (`tạm ứng`) and PIT withholding (`thuế TNCN`)
+- payable (AP) lifecycle and AP aging
+- per-branch management P&L (revenue − teacher payout − expenses)
+
+Global education payroll (Gusto, OnPay, Paycor) solves W-2 employee payroll +
+tax filing, not teacher-partner revenue-share settlement — not a reference model
+for the teacher-led case. This confirms: build, do not integrate.
+
+Design response lives in `docs/technical/12-settlement-and-payables.md`.
+
+## 8.5 Product modularity clarity
 
 Some competitors clearly operate ecosystems, but public packaging logic is not always explicit.
 

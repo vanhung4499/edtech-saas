@@ -3,7 +3,7 @@
 | Field      | Value                                                                                      |
 | ---------- | ------------------------------------------------------------------------------------------ |
 | Status     | Draft for review                                                                           |
-| Date       | 2026-07-04                                                                                 |
+| Date       | 2026-07-06                                                                                 |
 | Scope      | Academic / teaching-center business objects                                                |
 | Depends on | `docs/business/academic-business-architecture.md`, `docs/business/academic-context-map.md` |
 
@@ -93,6 +93,35 @@ Each object is described using the same structure:
 - `Must include`: tenant-wide, branch-specific, branch-set, or self-like visibility semantics.
 - `Must not include`: business role semantics such as accountant or teacher.
 - `Common confusions`: data scope is not the same as role.
+
+## 3.7 Module Entitlement
+
+- `Owner Context`: `Identity & Organization Core`
+- `Definition`: the record of which product modules a tenant has enabled and may use.
+- `Why it exists`: the platform sells modules separately (center management now;
+  study abroad, labor export, LMS later); menus, permissions, and commercial
+  packaging depend on what each tenant has bought.
+- `Must include`: tenant, module identity, enablement state, effective period.
+- `Must not include`: the module's business data, or billing of the SaaS
+  subscription itself.
+- `Common confusions`: module entitlement is not permission; a user may lack
+  permission to a module the tenant has enabled.
+
+## 3.8 Task (Work Item) — reserved
+
+- `Owner Context`: dedicated platform task capability (reserved; built with
+  Admissions)
+- `Definition`: a unit of human work — assigned, due, and trackable — linked to
+  the business record it is about.
+- `Why it exists`: admissions follow-ups, debt-collection reminders, and future
+  case checklists all need "who must do what by when" that no domain workflow
+  owns.
+- `Must include`: assignee, creator, due date, status, branch attribution,
+  module-agnostic link to the source record, origin (manual, rule, AI-proposed).
+- `Must not include`: business lifecycle state (enrollment status, invoice
+  state) — tasks sit on top of lifecycles, they do not replace them.
+- `Common confusions`: a task is not a consultation record (planned work vs
+  interaction log), and the task capability is not a workflow engine.
 
 ## 4. Admissions Objects
 
@@ -257,6 +286,20 @@ Examples:
 - `Must not include`: payout logic or revenue share formula.
 - `Common confusions`: teacher assignment is not teacher salary rule.
 
+## 5.10 Attendance
+
+- `Owner Context`: `Academic Delivery` (learner presence), reading session
+  occurrence facts from `Scheduling & Resources`
+- `Definition`: the record of a learner's actual presence in a delivered class session.
+- `Why it exists`: per-session pricing, teacher settlement, guardian
+  communication, and future learning-delivery features all depend on who actually
+  attended what.
+- `Must include`: learner, session reference, presence outcome, recording context.
+- `Must not include`: money calculation; session occurrence truth itself (owned
+  by scheduling).
+- `Common confusions`: attendance is not enrollment — enrollment is the right to
+  participate, attendance is the fact of presence.
+
 ## 6. Scheduling & Resources Objects
 
 ## 6.1 Room
@@ -291,7 +334,8 @@ Examples:
 - `Owner Context`: `Scheduling & Resources`
 - `Definition`: the actual dated sessions a class is expected or adjusted to run.
 - `Why it exists`: holidays, make-up classes, and substitutions break simple recurrence.
-- `Must include`: actual session instances or equivalent operational session truth.
+- `Must include`: actual session instances, whether each session actually ran,
+  and who actually taught it.
 - `Must not include`: billing truth by default.
 - `Common confusions`: session calendar is not payment schedule.
 
@@ -316,14 +360,30 @@ Examples:
 - `Must not include`: learner-specific final obligation truth.
 - `Common confusions`: pricing rule is not payment transaction and not invoice.
 
-## 7.2 Enrollment Financial Terms
+## 7.2 Financial Terms
 
 - `Owner Context`: `Finance`
-- `Definition`: the learner-specific financial commitment attached to academic participation.
+- `Definition`: the learner-specific financial commitment for a participation —
+  origin-agnostic (references a charge basis), so one structure serves academic
+  enrollments today and study-abroad or LMS purchases later.
 - `Why it exists`: learners in the same class may not owe the same amount or schedule.
-- `Must include`: charge basis, amount logic, discount effects, expected collection pattern.
-- `Must not include`: actual payment completion truth.
-- `Common confusions`: enrollment financial terms is not enrollment itself.
+- `Must include`: charge basis, charge model + billing timing + payment schedule
+  (the three billing axes), base and adjustment line items, net, collection pattern.
+- `Must not include`: actual payment completion truth; a per-module terms table.
+- `Common confusions`: financial terms is not enrollment itself; it is a single
+  Finance object, not one type per product module.
+
+## 7.2b Credit Balance
+
+- `Owner Context`: `Finance`
+- `Definition`: money the center owes a learner/payer — a liability, not a
+  receivable and not a payment.
+- `Why it exists`: overpayment, prepaid packages, and carry-forward on
+  transfer/drop create balances that must be tracked and later drawn down.
+- `Must include`: owning party, immutable credit/draw entries, derived balance.
+- `Must not include`: learner-owes-center amounts (that is a receivable).
+- `Common confusions`: a credit balance is not a receivable (opposite direction)
+  and not a payment (no money moved now).
 
 ## 7.3 Receivable Item
 
@@ -348,9 +408,12 @@ Examples:
 - `Owner Context`: `Finance`
 - `Definition`: a recorded money movement received from or paid to a party.
 - `Why it exists`: the system must distinguish money requested from money actually moved.
-- `Must include`: amount, method, received/paid timestamp, source evidence.
+- `Must include`: paying party (often a guardian), amount, method, received/paid
+  timestamp, source evidence.
 - `Must not include`: academic participation truth.
-- `Common confusions`: payment transaction is not billing and not invoice.
+- `Common confusions`: payment transaction is not billing and not invoice; it
+  belongs to the paying party, not to an enrollment, and one transaction may
+  settle receivables of several learners.
 
 ## 7.6 Reconciliation
 
@@ -409,6 +472,34 @@ Examples:
 - `Must not include`: learner enrollment status.
 - `Common confusions`: payable item is not expense category and not settlement rule.
 
+## 7.12 Charge Basis
+
+- `Owner Context`: `Finance`
+- `Definition`: the module-agnostic reference connecting a financial record to
+  whatever business fact caused it.
+- `Why it exists`: finance must serve academic today and study abroad, labor
+  export, or LMS later without changing receivable, payment, or invoice
+  structure. Each product module brings its own financial-terms concept, which
+  produces charge bases for finance.
+- `Must include`: source module, source object type, source reference.
+- `Must not include`: the source workflow's own state.
+- `Common confusions`: charge basis is not the enrollment or case record itself;
+  it is finance's pointer to it.
+
+## 7.13 Invoice Issuer Profile
+
+- `Owner Context`: `Finance`, anchored on legal identity from
+  `Identity & Organization Core`
+- `Definition`: the legal entity and tax identity under which invoices are issued.
+- `Why it exists`: Vietnamese e-invoice compliance requires the issuing entity's
+  tax identity, and one tenant may operate multiple legal entities across
+  branches.
+- `Must include`: legal name, tax code, invoice serial/configuration context,
+  branch mapping where applicable.
+- `Must not include`: receivable or payment truth.
+- `Common confusions`: issuer profile is not the tenant and not the branch —
+  several branches may share one legal entity, or one branch may have its own.
+
 ## 8. Reporting & Control Objects
 
 ## 8.1 Dashboard Metric
@@ -437,12 +528,16 @@ The following object pairs must remain separate:
 2. `Role` vs `Data Scope`
 3. `Lead/Prospect` vs `Enrollment`
 4. `Program` vs `Class`
-5. `Enrollment` vs `Enrollment Financial Terms`
+5. `Enrollment` vs `Financial Terms`
 6. `Teacher Assignment` vs `Teacher Commercial Terms`
 7. `Receivable Item` vs `Invoice`
 8. `Payment Request` vs `Payment Transaction`
 9. `Expense Item` vs `Payable Item`
 10. `Dashboard Metric` vs source transaction
+11. `Charge Basis` vs the product-module record it points to
+12. `Payment Transaction` (belongs to paying party) vs `Receivable Item` (belongs to learner charge)
+13. `Attendance` vs `Enrollment`
+14. `Module Entitlement` vs `Permission`
 
 ## 10. Architectural Conclusion
 
@@ -457,13 +552,15 @@ The most important business objects for the next stage are:
 - `Class`
 - `Enrollment`
 - `Teacher Assignment`
-- `Enrollment Financial Terms`
+- `Financial Terms`
 - `Receivable Item`
 - `Payment Transaction`
 - `Invoice`
 - `Teacher Commercial Terms`
 - `Teacher Settlement`
 - `Expense Item`
+- `Attendance`
+- `Charge Basis`
 
 These objects should be reused consistently in:
 

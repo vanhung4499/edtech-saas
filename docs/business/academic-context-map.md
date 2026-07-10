@@ -3,7 +3,7 @@
 | Field      | Value                                             |
 | ---------- | ------------------------------------------------- |
 | Status     | Draft for review                                  |
-| Date       | 2026-07-04                                        |
+| Date       | 2026-07-06                                        |
 | Scope      | Academic / teaching-center contexts only          |
 | Depends on | `docs/business/academic-business-architecture.md` |
 
@@ -260,7 +260,7 @@ readiness for the Academic business.
 
 - pricing rules
 - promotion financial effects
-- enrollment financial terms
+- financial terms
 - receivable items
 - due schedules
 - payment requests
@@ -482,6 +482,15 @@ Future domains such as `Study Abroad` and `Labor Export` should:
 - integrate with `Finance` through dedicated service-domain financial terms
 
 They should not reuse Academic Delivery as their workflow backbone.
+
+`LMS` (learning delivery) is reserved the same way: it should own curriculum,
+content, homework, assessment, and learning progress; consume class/enrollment
+truth from `Academic Delivery` and session/attendance facts from
+`Scheduling & Resources` and `Academic Delivery`; and reach money only through
+Finance's charge basis.
+
+AI-assisted features are not a context. They consume read models, events, and
+audit history, and act only by proposing commands to owning contexts.
 
 ## 10. Architectural Conclusion
 

@@ -37,7 +37,7 @@ Build the first serious center-management product:
 - `Program` is an offering family.
 - `Class` is the operational teaching unit.
 - `Enrollment` is academic participation.
-- `EnrollmentFinancialTerms` is the learner-specific financial commitment.
+- `FinancialTerms` is the learner-specific financial commitment.
 - `Payment` is not `Invoice`.
 - `TeacherAssignment` is not `TeacherCommercialTerms`.
 - `Finance` is a shared money module that must later support other product modules.

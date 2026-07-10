@@ -43,12 +43,13 @@ In these modules:
 
 ## Ownership Rules
 
-- `system` owns tenant, branch, user, role, permission, data scope, person.
+- `system` owns tenant, branch, user, role, permission, data scope, person, person merge, module entitlement.
 - `admissions` owns lead, prospect, consultation, placement, promotion intent.
-- `academic` owns program, class, enrollment, transfer, hold, teacher assignment.
-- `scheduling` owns room, schedule, session calendar, availability, conflicts.
-- `finance` owns financial terms, receivable, payment, invoice, expense, payable, settlement.
+- `academic` owns program, class, enrollment, transfer, hold, teacher assignment, learner attendance.
+- `scheduling` owns room, schedule, session calendar, session occurrence facts, availability, conflicts.
+- `finance` owns financial terms, charge basis, receivable, payment, invoice, invoice issuer profile, expense, payable, settlement.
 - `reporting` owns read models and dashboards only.
+- `tasks` (reserved) owns human work items linked to business records; it owns no business lifecycle.
 
 ## Boundary Rules
 
@@ -56,3 +57,6 @@ In these modules:
 - Do not put finance fields into enrollment.
 - Do not put teacher commercial terms into teacher assignment.
 - Do not use reporting as a hidden source of truth.
+- Finance records reference their origin via the charge basis, never a product module's tables directly.
+- Payment transactions belong to the paying party (often a guardian), not to an enrollment.
+- AI features propose module commands; they never write business truth directly.

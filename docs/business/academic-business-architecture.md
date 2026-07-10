@@ -3,7 +3,7 @@
 | Field    | Value                                        |
 | -------- | -------------------------------------------- |
 | Status   | Draft for review                             |
-| Date     | 2026-07-04                                   |
+| Date     | 2026-07-06                                   |
 | Scope    | Academic / teaching-center domain only       |
 | Excludes | Study Abroad, Labor Export detailed modeling |
 
@@ -71,6 +71,16 @@ realities even when product structure looks simple on paper.
 Finance is not a supporting utility. Tuition, debt tracking, teacher settlement,
 operating expenses, payment collection, and invoice readiness are core business
 capabilities.
+
+### 3.6 New domains extend, they do not modify
+
+Future domains (study abroad, labor export, LMS, AI-assisted features) plug into
+four stable extension points: shared person identity, per-tenant module
+entitlement, post-commit events, and the finance charge basis.
+
+Adding a domain must not require changing core module structures. If a new
+domain appears to need a core change, the extension contract is wrong and must
+be fixed first.
 
 ## 4. Business Domain Map
 
@@ -305,7 +315,7 @@ be collected.
 
 ### 11.1 Core capabilities
 
-- `Enrollment Financial Terms`
+- `Financial Terms`
 - `Charge Schedule`
 - `Receivable Items`
 - `Due Dates`
@@ -317,7 +327,7 @@ be collected.
 
 ### 11.2 Core rule
 
-`Enrollment` and `Enrollment Financial Terms` are separate.
+`Enrollment` and `Financial Terms` are separate.
 
 This is required because:
 
@@ -485,7 +495,7 @@ promotion/pricing offer -> enrollment -> class participation`
 
 ### 17.2 Learning to billing flow
 
-`Enrollment -> enrollment financial terms -> receivable schedule -> invoice-ready
+`Enrollment -> financial terms -> receivable schedule -> invoice-ready
 billing items`
 
 ### 17.3 Billing to payment flow
@@ -518,6 +528,58 @@ This document intentionally does not detail:
 These may be added later, but they are not required to validate the Academic
 business architecture.
 
+The architecture does, however, reserve explicit boundaries for the most likely
+future capabilities so today's domains do not grow into their space:
+
+### 18.1 LMS (learning delivery)
+
+Should own: curriculum, lesson content, homework, assessment, learning progress.
+
+Should use: `Identity & Organization Core` for people, `Academic Delivery` for
+class/enrollment truth, `Scheduling & Resources` for session and attendance
+facts, `Finance` through the charge basis if learning products are sold.
+
+Must not: absorb enrollment truth, or push content/homework concepts into
+`Academic Delivery` before the LMS domain exists.
+
+### 18.2 AI-assisted capabilities
+
+AI features are a consumer layer, not a domain. They read through reporting
+projections, events, and audit history, and act only by proposing commands to
+the owning contexts (lead scoring, debt-collection prioritization, scheduling
+suggestions, guardian-facing assistants).
+
+AI must never write business truth directly: AI proposes, modules dispose.
+
+### 18.3 Communication and notification
+
+Notification is an event consumer with channel adapters for Vietnam-first
+channels (Zalo ZNS, SMS, email), with templates anchored in the shared core.
+Business modules emit events; they do not send messages themselves. Tuition
+reminders are a notification concern fed by finance events, not a finance
+capability.
+
+### 18.4 Task / work management
+
+A dedicated light platform module for human work items: assignee, due date,
+status, and a module-agnostic link to the business record the task is about
+(same polymorphic philosophy as the finance charge basis). First consumers:
+admissions follow-ups (call back, placement appointment), finance collection
+tasks, and later study-abroad document checklists.
+
+Boundaries:
+
+- Tasks are the human-work layer **on top of** module lifecycles. Business
+  state machines (enrollment status, invoice lifecycle, case pipeline) stay
+  owned by their modules — this reservation is not a generic workflow engine,
+  which remains a non-goal.
+- Task due-dates feed the notification capability; they do not send messages
+  themselves.
+- AI-proposed actions materialize as suggested tasks for humans to accept —
+  this is the natural surface for "AI proposes, modules dispose".
+- Scope guard: tasks linked to business records are the value; do not drift
+  into a standalone project-management tool.
+
 ## 19. Architectural Conclusion
 
 The Academic business architecture should be understood as:
@@ -534,7 +596,7 @@ The key structural decisions in v1 are:
 
 1. `Program -> Class` is the academic delivery backbone.
 2. `Role` and `Data Scope` are separate.
-3. `Enrollment` is separate from `Enrollment Financial Terms`.
+3. `Enrollment` is separate from `Financial Terms`.
 4. `Teacher Assignment` is separate from `Teacher Commercial Terms`.
 5. `Finance` is broader than `Billing`.
 6. `Invoice` is mandatory as a first-class capability.

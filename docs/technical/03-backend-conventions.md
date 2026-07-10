@@ -1,121 +1,61 @@
-# Backend Conventions v2
+# Backend Conventions
 
-| Field      | Value                                                                                     |
-| ---------- | ----------------------------------------------------------------------------------------- |
-| Status     | Draft for review                                                                          |
-| Date       | 2026-07-05                                                                                |
-| Scope      | NestJS and Drizzle coding conventions for modules, layers, transactions, and model naming |
-| Depends on | `01-system-architecture.md`, `02-module-boundaries.md`                                    |
+| Field      | Value                                                              |
+| ---------- | ------------------------------------------------------------------ |
+| Status     | Active                                                             |
+| Date       | 2026-07-06                                                         |
+| Scope      | NestJS coding conventions: modules, layers, API, errors, config    |
+| Depends on | `01-system-architecture.md`, `02-module-boundaries.md`             |
 
-## 1. Purpose
+## 1. Module Shapes
 
-This document defines how backend modules should be coded.
-
-It keeps the architecture simple enough to build, while preventing the core business modules from becoming giant service files.
-
-## 2. Default Module Shape
-
-Use two module shapes.
-
-Light modules should use the direct NestJS 3-layer shape:
+Light modules:
 
 ```txt
 module/
-  controller/
-  service/
-  repository/
-```
-
-Heavy modules should use the more explicit shape:
-
-```txt
-module/
-  interfaces/
-  application/
-  domain/
-  infrastructure/
-```
-
-The purpose is practical:
-
-- simple modules should look simple
-- heavy modules should have enough structure to keep business rules out of giant service files
-
-## 3. Light Module Pattern
-
-Light modules use direct 3-layer NestJS structure.
-
-```txt
-controller -> service -> repository
-```
-
-Good candidates:
-
-- `system` subfeatures
-- `admissions` v1
-- `reporting`
-- `document`
-- `notification`
-- configuration dictionaries
-
-Recommended package shape:
-
-```txt
-admissions/
   controller/
     lead.controller.ts
     dto/
       create-lead.request.ts
       lead.response.ts
-
   service/
     lead.service.ts
-
   repository/
     lead.repository.ts
-    lead.table.ts
     lead.mapper.ts
 ```
 
-In light modules, `service` may use Drizzle row objects directly.
+Table definitions do **not** live in the module: all Drizzle schema lives in
+`packages/database/src/schema/<module>.ts` (`05-database-and-migrations.md`).
+Ownership is logical — only the owning module's repositories may query its
+tables.
 
-This is acceptable when:
-
-- logic is mostly CRUD
-- there is no complex lifecycle
-- there is no money calculation
-- there is no important state transition
-
-## 4. Heavy Module Pattern
-
-Heavy modules use selective domain modeling.
+Heavy modules (`academic`, `scheduling`, `finance`):
 
 ```txt
-interfaces -> application -> domain -> infrastructure
+module/
+  interfaces/       controllers, DTOs, webhook/job entrypoints
+  application/      use cases, transaction boundaries, orchestration
+  domain/           domain objects, value objects, policies, calculators
+  infrastructure/   repositories, mappers, provider adapters
 ```
 
-Heavy modules:
+(Heavy modules follow the same rule: tables live in `packages/database`.)
 
-- `academic`
-- `scheduling`
-- `finance`
+Layer responsibilities:
 
-Use domain objects, policies, or calculators when there is real business weight.
+| Layer                       | Contains                                            | Never contains                       |
+| --------------------------- | --------------------------------------------------- | ------------------------------------ |
+| controller / interfaces     | REST controllers, DTOs, input validation            | business rules, SQL, transactions    |
+| service / application       | use cases, transactions, permission checks, events  | table definitions                    |
+| domain                      | policies, calculators, lifecycle rules              | NestJS decorators, Drizzle anything  |
+| repository / infrastructure | queries, mappers, provider adapters                 | cross-module orchestration           |
 
-Examples:
+`domain` exists only where useful. Examples of things that earn it:
+`EnrollmentLifecyclePolicy`, `ScheduleConflictPolicy`, `PaymentAllocationPolicy`,
+`TeacherSettlementCalculator`, `Money`.
 
-- `EnrollmentLifecyclePolicy`
-- `ScheduleConflictPolicy`
-- `ReceivableGenerationPolicy`
-- `PaymentAllocationPolicy`
-- `InvoiceIssuancePolicy`
-- `TeacherSettlementCalculator`
-- `Money`
-- `RevenueShareSpec`
-
-## 5. Naming Rules
-
-Use these suffixes consistently:
+## 2. Naming
 
 | Concept              | Naming                    |
 | -------------------- | ------------------------- |
@@ -128,235 +68,69 @@ Use these suffixes consistently:
 | Domain object        | `Enrollment`              |
 | Mapper               | `EnrollmentMapper`        |
 
-Do not use `Entity` for Drizzle rows.
+Never name a Drizzle row `*Entity`. `Entity` is reserved for domain objects.
 
-Reason:
+## 3. Drizzle Row Usage
 
-- `Entity` should be reserved for domain objects when the module needs them
-- Drizzle rows are persistence records, not business entities
-
-## 6. Layer Responsibilities
-
-## 6.1 Light module layers
-
-### `controller`
-
-Contains:
-
-- REST controllers
-- request/response models
-- simple input validation
-
-Should not contain:
-
-- business rules
-- SQL
-- transaction orchestration
-
-### `service`
-
-Contains:
-
-- use case logic
-- simple validation
-- transaction boundaries
-- calls to repositories
-- calls to other module services when allowed
-
-This is where explicit Drizzle transactions belong for light modules when the use case needs atomic writes.
-
-### `repository`
-
-Contains:
-
-- Drizzle table definitions
-- Drizzle query code
-- row-to-domain mappers if needed
-- custom SQL when needed
-
-## 6.2 Heavy module layers
-
-### `interfaces`
-
-Contains:
-
-- REST controllers
-- request/response models
-- webhook handlers later
-- job entrypoints if exposed as module handlers
-
-Should not contain:
-
-- business rules
-- SQL
-- transaction orchestration
-
-### `application`
-
-Contains:
-
-- use case services
-- transaction boundaries
-- permission checks
-- orchestration across repositories/domain policies
-- post-commit event publication
-
-This is where explicit Drizzle transactions usually belong for heavy modules.
-
-### `domain`
-
-Only exists where useful.
-
-Contains:
-
-- domain objects
-- value objects
-- policies
-- calculators
-- lifecycle/state transition rules
-
-Does not contain:
-
-- NestJS decorators
-- Drizzle schema/table definitions
-- persistence row objects
-
-### `infrastructure`
-
-Contains:
-
-- Drizzle table definitions
-- Drizzle repositories
-- SQL helpers
-- external provider adapters
-- persistence converters
-
-Should not contain:
-
-- high-level business orchestration
-- cross-module workflow logic
-
-## 7. Transaction Rules
-
-Use explicit Drizzle transactions at service/application boundaries.
-
-For light modules, this usually means `service`.
-
-For heavy modules, this usually means `application`.
-
-Example:
-
-```ts
-export class CreateEnrollment {
-  constructor(private readonly db: Db) {}
-
-  async execute(command: CreateEnrollmentCommand) {
-    return this.db.transaction(async (tx) => {
-      // validate, create enrollment, create finance basis, write audit
-      return enrollmentId;
-    });
-  }
-}
-```
-
-Rules:
-
-1. Do not open transactions in controllers.
-2. Keep transactions short.
-3. Do not call slow external providers inside transactions.
-4. Publish events after commit when possible.
-5. Avoid nested transactions unless there is a deliberate reason.
-6. Domain objects must not know about Drizzle transactions.
-
-## 8. Drizzle Row Usage Rule
-
-Light modules may use Drizzle row objects inside services.
-
-Heavy modules should not treat Drizzle row objects as domain models.
-
-Allowed:
+Light modules may use rows directly in services when logic is CRUD-simple:
 
 ```txt
 Request -> Service -> Drizzle Row -> Repository -> DB
 ```
 
-for light modules.
-
-Preferred for heavy modules:
+Heavy modules map rows into domain objects when business rules matter:
 
 ```txt
 Request -> Command -> Domain Object / Policy -> Row Snapshot -> Repository -> DB
 ```
 
-Never allow:
+Never, in any module:
 
-- Drizzle row as public API response contract
-- Drizzle row crossing module boundary
-- Drizzle row carrying finance or academic business behavior
+- a Drizzle row as a public API response
+- a Drizzle row crossing a module boundary
+- a Drizzle row carrying finance or academic business behavior
 
-## 9. Event Rule
+## 4. Transactions
 
-Use internal events only for downstream reactions.
+All tenant-scoped reads/writes go through the tenant-bound unit of work
+(`Database.run(...)`, defined in `04-tenancy-and-data-scope.md`), which opens a
+Drizzle transaction with RLS active.
 
-Good:
+Rules:
 
-- `EnrollmentCreated` refreshes reporting
-- `PaymentRecorded` sends notification
-- `InvoiceIssued` starts provider sync job
+1. Controllers never open transactions.
+2. Light modules open them in `service`; heavy modules in `application`.
+3. Keep transactions short.
+4. Never call slow external providers inside a transaction.
+5. Publish events after commit.
+6. Domain objects must not know about transactions.
 
-Avoid:
+## 5. API Contract
 
-- using events as a way to hide core business workflow
-- making finance correctness depend on eventually consistent side effects
+- NestJS DTO classes are the source of truth for REST contracts.
+- `*.request.ts` / `*.response.ts`, validated with `class-validator`, transformed
+  with `class-transformer`, documented with Swagger decorators.
+- Common DTOs (pagination, id param, date range) live in `apps/api/src/common/dto`.
+- Global prefix `api` + URI versioning; phase-1 routes live under `/api/v1`.
+- Swagger UI at `/api/docs`, OpenAPI JSON at `/api/openapi.json`.
+- No shared contracts package. No backend domain objects in the frontend.
 
-## 10. API Contract Rule
+## 6. Result Envelope
 
-Frontend should consume generated TypeScript clients/types from OpenAPI.
-
-NestJS DTO classes are the source of truth for REST request/response contracts.
-
-Do not create a shared request/response contracts package for normal REST APIs.
-
-Do not share backend domain objects with frontend.
-
-API contracts are separate from:
-
-- domain objects
-- Drizzle rows
-- database schema
-
-## 11. Result Rule
-
-All normal API responses are wrapped by the global `ResultInterceptor`:
+The global `ResultInterceptor` wraps every success response:
 
 ```json
-{
-  "code": "SUCCESS",
-  "message": "Success",
-  "data": {},
-  "traceId": "request-id"
-}
+{ "code": "SUCCESS", "message": "Success", "data": {}, "traceId": "request-id" }
 ```
 
-Controllers should return business data directly in most cases.
+- Controllers return business data directly.
+- For a custom success code, return a `ResultBody`-shaped object
+  (`{ code, message, data }`).
+- Never return Drizzle rows as `data`.
 
-If a use case needs a custom success code/message, return a `ResultBody`-shaped object:
+## 7. Errors
 
-```ts
-return {
-  code: "TENANT_CREATED",
-  message: "Tenant created",
-  data: tenant,
-};
-```
-
-Do not return Drizzle rows directly as public response data.
-
-## 12. Exception Rule
-
-Use `AppException` for application/business errors.
-
-Examples:
+Use `AppException` for business errors:
 
 ```ts
 throw AppException.notFound("USER_NOT_FOUND", "User not found");
@@ -365,104 +139,51 @@ throw AppException.conflict("ENROLLMENT_ALREADY_ACTIVE", "Enrollment already act
 
 Rules:
 
-1. Error codes should be short and human-readable, such as `USER_NOT_FOUND`.
-2. Do not create one global enum containing every module error code.
-3. Each module may define its own local error-code file when it has enough errors.
-4. `AppException` must carry the correct HTTP status.
-5. Built-in NestJS exceptions are allowed for generic HTTP errors.
-6. The global exception filter wraps both `AppException` and NestJS exceptions into the same response shape.
+1. Codes are short and human-readable (`USER_NOT_FOUND`).
+2. No global enum of every error code; modules keep local code files.
+3. `AppException` carries the correct HTTP status.
+4. Built-in NestJS exceptions are fine for generic HTTP errors; the global filter
+   normalizes both into the same envelope (`data: null`).
+5. Validation errors return `code: "VALIDATION_ERROR"` with
+   `data.fields: [{ field, message }]`.
 
-Error response shape:
+## 8. Trace ID
 
-```json
-{
-  "code": "USER_NOT_FOUND",
-  "message": "User not found",
-  "data": null,
-  "traceId": "request-id"
-}
-```
+Every request has a `traceId`: the API reads `x-request-id` or generates one, and
+returns it in both the response header and body. This is the phase-1 debugging
+story — no observability stack yet.
 
-Validation errors use:
+## 9. Configuration
 
-```json
-{
-  "code": "VALIDATION_ERROR",
-  "message": "Validation failed",
-  "data": {
-    "fields": [{ "field": "email", "message": "email must be an email" }]
-  },
-  "traceId": "request-id"
-}
-```
+1. `ConfigModule` is global; env is validated by the zod schema in
+   `apps/api/src/config/server-env.ts`.
+2. Feature modules never read `process.env`; use `ConfigService<ServerEnv, true>`.
+3. Adding a required env var means updating `server-env.ts` **and** `.env.example`.
 
-## 13. Trace ID Rule
+## 10. Events
 
-Every request has a `traceId`.
+Internal, post-commit, downstream reactions only. Mechanism (buffered
+`DomainEvents` facade over `@nestjs/event-emitter` + BullMQ, flushed after
+commit) is specified in `10-cross-cutting-conventions.md`.
 
-The API reads `x-request-id` when provided. Otherwise, it generates a new id and returns it in both the `x-request-id` response header and response body.
+- good: `EnrollmentCreated` -> reporting refresh; `PaymentRecorded` -> notification;
+  `InvoiceIssued` -> provider sync job
+- bad: hiding core workflow behind events, or making finance correctness depend on
+  eventually-consistent side effects
 
-Use `traceId` for support/debugging:
+## 11. Background Jobs
 
-- user reports an error
-- frontend sends the trace id to support
-- backend logs can later be searched by the same id
+- BullMQ on Redis; the worker app processes queues.
+- Job payloads always carry tenant context and are enqueued via the helper in
+  `04-tenancy-and-data-scope.md` — never `queue.add` directly for tenant work.
+- Handlers must be idempotent (jobs retry).
+- Name queues by module: `finance.invoice-sync`, `reporting.refresh`.
 
-This is intentionally lightweight. Do not introduce a full observability stack in phase 1.
+## 12. Testing
 
-## 14. DTO and OpenAPI Rule
-
-NestJS DTO classes are the source of truth for REST request/response contracts.
-
-Use:
-
-- `*.request.ts` for request/query/param/body DTOs
-- `*.response.ts` for response DTOs
-- `class-validator` for validation
-- `class-transformer` for query/body transformation
-- Swagger decorators for OpenAPI schema
-
-Common DTOs live under `apps/api/src/common/dto`.
-
-Swagger UI:
-
-```txt
-/api/docs
-```
-
-OpenAPI JSON:
-
-```txt
-/api/openapi.json
-```
-
-API routes use URI versioning.
-
-Phase 1 routes should live under:
-
-```txt
-/api/v1
-```
-
-## 15. Configuration Rule
-
-The API uses NestJS `ConfigModule` as a global module.
-
-Rules:
-
-1. Do not read `process.env` directly in feature modules.
-2. Add API runtime env variables to `apps/api/src/config/server-env.ts`.
-3. Keep `.env.example` updated whenever a required env variable is added.
-4. Commit `.env.example`, but never commit real `.env` files.
-5. Read config values through `ConfigService<ServerEnv, true>`.
-
-Local env files are loaded from:
-
-```txt
-../../.env.local
-../../.env
-.env.local
-.env
-```
-
-This allows running the API from either the repo root or the app folder.
+- Vitest, colocated `*.spec.ts` next to the code under test.
+- `pnpm --filter @edtech/api exec vitest run <path>` for a single file.
+- Priorities: domain policies/calculators (pure, cheap to test), tenant isolation
+  (mandatory suite in `04-tenancy-and-data-scope.md`), finance math
+  (`06-finance.md`), and the common pipeline (interceptor/filter/validation —
+  already covered).
