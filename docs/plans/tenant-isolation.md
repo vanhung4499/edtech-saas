@@ -21,17 +21,23 @@ established pattern.
 
 - `apps/api/src/database`: `client.ts`, `schema/system.ts` (`system_tenants`,
   `system_branches`), `schema/columns.ts` (`idColumn`, `timestampColumns`,
-  `tenantColumn`, `branchColumn`). Two migrations: `0000_bootstrap_app_role`
-  (custom, creates the `edtech_app` runtime role + grants), then
-  `0001_system_tenants_and_branches` (schema, `system_branches` unique on
-  `(tenant_id, code)`). Steps 1–2 done, verified against a real local Postgres:
+  `tenantColumn`, `branchColumn`), `tenant-rls.ts` (`enableTenantRls(table)` —
+  generates the standard tenant-owned-table RLS SQL for future migrations to
+  paste in). Three migrations: `0000_bootstrap_app_role` (custom, `edtech_app`
+  role + grants), `0001_system_tenants_and_branches` (schema, `system_branches`
+  unique on `(tenant_id, code)`), `0002_enable_rls_system_tables` (RLS on both
+  tables — `system_tenants` uses the id-based special-case policy, no
+  `tenant_id` column). Steps 1–3 done, verified against a real local Postgres:
   fresh `docker compose up -d` + `pnpm db:migrate` (owner) + `pnpm db:seed`
   (owner) all work; `edtech_app` can `select`/`insert`/`update`/`delete` but a
-  `create table` as `edtech_app` fails with `permission denied for schema public`.
+  `create table` as `edtech_app` fails with `permission denied for schema
+  public`; as `edtech_app` with no `app.tenant_id` GUC set, both tables return
+  zero rows; with the GUC set to the seeded tenant's own id, it sees exactly
+  that row; with the GUC set to an unrelated id, zero rows again.
 - `apps/api`: pipeline wired in `main.ts` (result/exception/validation/traceId),
   `AppModule` has only `ConfigModule` + health. No auth, no db wiring yet.
 - worker runs as an `apps/api` entrypoint (`worker.ts`), in-process by default; no queue processing yet.
-- Remaining gap vs design: no RLS yet (Step 3).
+- Remaining gap vs design: `withTenant` unit of work not built yet (Step 4).
 
 ## 3. Work Breakdown
 
