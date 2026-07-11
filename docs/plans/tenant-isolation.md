@@ -21,23 +21,32 @@ established pattern.
 
 - `apps/api/src/database`: `client.ts`, `schema/system.ts` (`system_tenants`,
   `system_branches`), `schema/columns.ts` (`idColumn`, `timestampColumns`,
-  `tenantColumn`, `branchColumn`), `tenant-rls.ts` (`enableTenantRls(table)` —
-  generates the standard tenant-owned-table RLS SQL for future migrations to
-  paste in). Three migrations: `0000_bootstrap_app_role` (custom, `edtech_app`
-  role + grants), `0001_system_tenants_and_branches` (schema, `system_branches`
-  unique on `(tenant_id, code)`), `0002_enable_rls_system_tables` (RLS on both
-  tables — `system_tenants` uses the id-based special-case policy, no
-  `tenant_id` column). Steps 1–3 done, verified against a real local Postgres:
-  fresh `docker compose up -d` + `pnpm db:migrate` (owner) + `pnpm db:seed`
-  (owner) all work; `edtech_app` can `select`/`insert`/`update`/`delete` but a
-  `create table` as `edtech_app` fails with `permission denied for schema
-  public`; as `edtech_app` with no `app.tenant_id` GUC set, both tables return
-  zero rows; with the GUC set to the seeded tenant's own id, it sees exactly
-  that row; with the GUC set to an unrelated id, zero rows again.
+  `tenantColumn`, `branchColumn`), `tenant-rls.ts` (`enableTenantRls(table)`),
+  `tenant.ts` (`withTenant(db, tenantId, fn)` + `TenantTx`). Four migrations:
+  `0000_bootstrap_app_role`, `0001_system_tenants_and_branches`,
+  `0002_enable_rls_system_tables`, `0003_fix_rls_pooled_connection_guc_revert`
+  (bug found while verifying step 4 — see below). Steps 1–4 done, verified
+  against a real local Postgres: fresh `docker compose up -d` +
+  `pnpm db:migrate` (owner) + `pnpm db:seed` (owner) all work; `edtech_app`
+  can `select`/`insert`/`update`/`delete` but a `create table` fails with
+  `permission denied for schema public`; RLS fail-closed/scoped/fail-closed
+  confirmed for no-GUC / correct-GUC / wrong-GUC; `withTenant` verified to set
+  the GUC inside its transaction and leave it unset (post-fix) outside it,
+  including on a reused pooled connection, and two sequential `withTenant`
+  calls on the same pool don't leak between each other.
+- **Bug found and fixed**: `current_setting('app.tenant_id', true)` returns
+  NULL on a connection that's never touched the GUC, but on a pooled
+  connection that has (even transactionally, even after
+  commit/rollback), it reverts to `''`, not NULL — `''::uuid` throws instead
+  of degrading to zero rows. Fixed with `nullif(current_setting(...), '')`
+  in both `tenant-rls.ts` and `04-tenancy-and-data-scope.md` §6.2's template,
+  applied via `0003_fix_rls_pooled_connection_guc_revert`. This would have
+  been caught by step 7's pool-reuse test either way, but surfaced naturally
+  while building step 4.
 - `apps/api`: pipeline wired in `main.ts` (result/exception/validation/traceId),
   `AppModule` has only `ConfigModule` + health. No auth, no db wiring yet.
 - worker runs as an `apps/api` entrypoint (`worker.ts`), in-process by default; no queue processing yet.
-- Remaining gap vs design: `withTenant` unit of work not built yet (Step 4).
+- Remaining gap vs design: no tenant context at the API layer yet (Step 5).
 
 ## 3. Work Breakdown
 

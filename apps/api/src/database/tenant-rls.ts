@@ -7,10 +7,14 @@ import { getTableName, type Table } from "drizzle-orm";
 // the same migration (05-database-and-migrations.md §3 rule 2).
 export function enableTenantRls(table: Table): string {
   const name = getTableName(table);
+  // nullif(..., '') matters under connection pooling: set_config(..., true)
+  // reverts a transaction-local GUC to '' (not NULL) once the connection has
+  // had it set at all, and ''::uuid throws instead of degrading to zero rows.
+  const guc = `nullif(current_setting('app.tenant_id', true), '')::uuid`;
 
   return `alter table "${name}" enable row level security;
 alter table "${name}" force row level security;
 create policy tenant_isolation on "${name}"
-  using (tenant_id = current_setting('app.tenant_id', true)::uuid)
-  with check (tenant_id = current_setting('app.tenant_id', true)::uuid);`;
+  using (tenant_id = ${guc})
+  with check (tenant_id = ${guc});`;
 }

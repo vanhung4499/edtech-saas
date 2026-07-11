@@ -128,13 +128,22 @@ tenant-owned table using the shared helper:
 alter table <table> enable row level security;
 alter table <table> force  row level security;
 create policy tenant_isolation on <table>
-  using      (tenant_id = current_setting('app.tenant_id', true)::uuid)
-  with check (tenant_id = current_setting('app.tenant_id', true)::uuid);
+  using      (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid)
+  with check (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
 ```
 
-`current_setting(..., true)` returns NULL when unset, so an unbound connection
-sees zero rows and cannot write: fail closed. `with check` also blocks updates
-that would move a row across tenants.
+`current_setting(..., true)` returns NULL when the GUC has never been touched
+on this connection, so an unbound connection sees zero rows and cannot write:
+fail closed. The `nullif(..., '')` matters under connection pooling
+specifically: `set_config(..., true)` (§6.3) scopes the value to one
+transaction, but once a pooled connection has had the GUC set at all, it
+reverts to `''` on commit/rollback — not back to NULL. Casting `''::uuid`
+directly throws instead of degrading to zero rows, so a later request that
+reuses that connection and queries outside `withTenant` gets a 500 instead of
+the intended fail-closed empty result. `nullif` converts that `''` back to
+NULL before the cast, keeping the fail-closed behavior consistent regardless
+of the connection's history. `with check` also blocks updates that would move
+a row across tenants.
 
 ### 6.3 Binding the tenant per unit of work
 
