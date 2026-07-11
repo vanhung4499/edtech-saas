@@ -218,7 +218,9 @@ Integration tests seed two tenants A and B, then assert:
 3. A query with no tenant context returns zero rows / fails.
 4. A job enqueued under A processes under A and cannot touch B.
 
-These tests are non-negotiable and run in CI.
+These tests are non-negotiable — the regression gate is `pnpm test` locally
+against a real Postgres (`docker compose up -d`); no CI pipeline for this
+project.
 
 ## 11. Rollout Checklist
 

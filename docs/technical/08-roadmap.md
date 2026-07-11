@@ -46,7 +46,8 @@ The current phase. Order inside the phase matters:
 5. **OpenAPI client generation** wired into `apps/web` (`07-frontend.md`).
 
 Exit: users log in; roles and branch/data scope restrict access; two-tenant
-isolation tests pass in CI; business modules can depend on `system`.
+isolation tests pass (`pnpm test` locally — no CI pipeline for this project);
+business modules can depend on `system`.
 
 ## 4. Phase 2: Academic Core
 
