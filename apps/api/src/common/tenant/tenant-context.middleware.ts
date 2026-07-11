@@ -1,15 +1,11 @@
 import { Injectable, type NestMiddleware } from "@nestjs/common";
 import { TenantContext, type TenantScope } from "./tenant-context";
 
-// Populated by the (not yet built) auth layer from a verified token — never
-// from a raw client header or query param (04-tenancy-and-data-scope.md §5
-// rule 1). No dev fallback: a temporary header-based tenant id would outlive
-// its welcome.
+// Set by session.middleware.ts from a verified session — never from a raw
+// client header or query param (04-tenancy-and-data-scope.md §5 rule 1).
 export interface AuthClaims {
   tenantId: string;
   userId: string;
-  branchIds: string[] | "ALL";
-  roles: string[];
 }
 
 interface RequestWithAuth {
@@ -18,6 +14,12 @@ interface RequestWithAuth {
 
 type NextFunction = () => void;
 
+// req.auth only carries ids until the authz resolver (auth-rbac plan step 5)
+// resolves real roles/branch scope — until then, branchIds/roles stay empty
+// ("no scope granted yet"). That fails closed for anything that checks them
+// (PermissionsGuard, applyBranchScope — matching TenantGuard/RLS already
+// failing closed by default) without blocking tenant-scoped DB access itself,
+// since Database.run only needs tenantId.
 export function tenantContextMiddleware(
   request: RequestWithAuth,
   _response: unknown,
@@ -31,8 +33,8 @@ export function tenantContextMiddleware(
   const scope: TenantScope = {
     tenantId: request.auth.tenantId,
     userId: request.auth.userId,
-    branchIds: request.auth.branchIds,
-    roles: request.auth.roles,
+    branchIds: [],
+    roles: [],
   };
 
   TenantContext.run(scope, next);

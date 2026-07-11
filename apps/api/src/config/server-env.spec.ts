@@ -5,6 +5,7 @@ describe("parseServerEnv", () => {
   it("parses valid server environment values with defaults", () => {
     const env = parseServerEnv({
       DATABASE_URL: "postgres://edtech:edtech@localhost:5432/edtech",
+      REDIS_URL: "redis://localhost:6379",
       AUTH_SECRET: "change-me-in-local-env",
     });
 
@@ -15,7 +16,7 @@ describe("parseServerEnv", () => {
       API_URL: "http://localhost:3001",
       DATABASE_URL: "postgres://edtech:edtech@localhost:5432/edtech",
       DATABASE_MIGRATE_URL: undefined,
-      REDIS_URL: undefined,
+      REDIS_URL: "redis://localhost:6379",
       AUTH_SECRET: "change-me-in-local-env",
     });
   });
@@ -24,6 +25,7 @@ describe("parseServerEnv", () => {
     const env = parseServerEnv({
       DATABASE_URL: "postgres://edtech_app:edtech_app@localhost:5432/edtech",
       DATABASE_MIGRATE_URL: "postgres://edtech:edtech@localhost:5432/edtech",
+      REDIS_URL: "redis://localhost:6379",
       AUTH_SECRET: "change-me-in-local-env",
     });
 
@@ -36,6 +38,7 @@ describe("parseServerEnv", () => {
       APP_URL: "http://localhost:5173",
       API_URL: "http://localhost:4000",
       DATABASE_URL: "postgres://edtech:edtech@localhost:5432/edtech",
+      REDIS_URL: "redis://localhost:6379",
       AUTH_SECRET: "change-me-in-local-env",
     });
 
@@ -44,7 +47,7 @@ describe("parseServerEnv", () => {
 
   it("throws a readable error when required values are invalid", () => {
     expect(() => parseServerEnv({ AUTH_SECRET: "short" })).toThrow(
-      "Invalid server environment: DATABASE_URL: Invalid input: expected string, received undefined; AUTH_SECRET: Too small: expected string to have >=16 characters",
+      "Invalid server environment: DATABASE_URL: Invalid input: expected string, received undefined; REDIS_URL: Invalid input: expected string, received undefined; AUTH_SECRET: Too small: expected string to have >=16 characters",
     );
   });
 });

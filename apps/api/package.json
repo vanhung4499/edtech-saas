@@ -27,6 +27,7 @@
     "bullmq": "^5.79.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^5.11.1",
     "pg": "^8.22.0",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.23",
+    "@types/cookie-parser": "^1.4.10",
     "@types/node": "^26.1.1",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",

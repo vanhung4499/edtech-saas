@@ -106,6 +106,51 @@ Registry unit test covers key shape, known-module prefixes, no duplicates.
 
 Done: unit tests on store TTL/index behavior with a real Redis from compose.
 
+**Status: done.** `common/redis/` (new, sibling to `common/database/`) holds
+`redis.provider.ts` (`REDIS` token, `ioredis` client from `REDIS_URL`) and a
+`@Global()` `RedisModule` — kept separate from auth on purpose, since Redis is
+an infra dependency other modules may need later, not an auth-only concern.
+`common/auth/session.store.ts` is a thin `SessionStore` over it: sliding TTL
+12h, absolute cap 7d (`touch()` refuses to extend past the absolute lifetime
+and destroys the session if the cap has already passed), plus a
+`user-sessions:<tenantId>:<userId>` index set for `destroyAllForUser()`. 7
+tests against a real Redis (via compose), including the absolute-cap and
+destroy-on-expired-cap paths using a manually backdated `createdAt`.
+`common/auth/auth-infrastructure.module.ts` now just provides/exports
+`SessionStore`, relying on the globally available `REDIS` token.
+
+`session.middleware.ts` reads the signed `edtech_session` cookie
+(`cookie-parser` + `AUTH_SECRET`), touches the store, and sets
+`req.auth = { userId, tenantId }`; a missing/invalid/tampered cookie clears
+the cookie and leaves `req.auth` unset for guards to reject downstream.
+`origin-check.middleware.ts` rejects mutating requests (POST/PUT/PATCH/DELETE)
+whose `Origin` doesn't exactly match `APP_URL`. `db.platform.ts` adds
+`PLATFORM_DB` (owner-role client off `DATABASE_MIGRATE_URL`, RLS-bypassing,
+exported raw) for the narrow cross-tenant paths documented in
+`04-tenancy-and-data-scope.md` §9. Pipeline order in `main.ts`: `requestId` ->
+origin check -> `cookieParser` -> session -> tenant context -> request
+logging.
+
+Found and fixed a real bug during live verification: both `session.middleware.ts`
+and `origin-check.middleware.ts` run as plain `app.use()` Express middleware,
+which sits **outside** Nest's `useGlobalFilters()` pipeline — confirmed
+empirically that an uncaught error there reaches Express's default handler
+instead of `AppExceptionFilter`, leaking raw internals (a corrupted session
+value's `JSON.parse` error came through verbatim to the client). Fixed by
+wrapping `sessionStore.touch()` in try/catch: log the real error server-side
+via `Logger` (traceId + stack) and hand-construct the same safe
+`{code, message, data, traceId}` 500 envelope `AppExceptionFilter` would
+produce. Re-verified with a clean process restart: client gets the safe
+response, server log has the full stack trace.
+
+Live-verified end-to-end against real Postgres + Redis (temporary smoke routes
+in `health.controller.ts`, reverted after): public health route unaffected;
+origin check 403s on a mismatched `Origin` and passes on a matching one;
+unauthenticated `whoami` 401s via `TenantGuard`; session creation -> signed
+cookie -> `whoami` correctly populates `req.auth` and `TenantContext`; a
+tampered cookie is rejected and cleared. Full monorepo
+`typecheck && lint && test && build` green (33/33 tests).
+
 ### Step 4: Auth module (login/logout/me/change-password)
 
 `apps/api/src/modules/system/auth/` (light module):
