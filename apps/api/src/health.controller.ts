@@ -1,6 +1,5 @@
 import { Controller, Get } from "@nestjs/common";
-import { ApiProperty, ApiTags } from "@nestjs/swagger";
-import { ApiResult } from "./common/result/swagger-result";
+import { ApiOkResponse, ApiProperty, ApiTags } from "@nestjs/swagger";
 
 class HealthResponse {
   @ApiProperty({ example: "ok" })
@@ -14,7 +13,7 @@ class HealthResponse {
 @ApiTags("Health")
 export class HealthController {
   @Get()
-  @ApiResult(HealthResponse)
+  @ApiOkResponse({ type: HealthResponse })
   getHealth() {
     return {
       status: "ok",

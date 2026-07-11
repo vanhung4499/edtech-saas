@@ -7,7 +7,7 @@ import { AppExceptionFilter } from "./common/exceptions/app-exception.filter";
 import { setupOpenApi } from "./common/openapi/setup-openapi";
 import { createValidationException } from "./common/pipes/validation-exception.factory";
 import { requestIdMiddleware } from "./common/request/request-id.middleware";
-import { ResultInterceptor } from "./common/result/result.interceptor";
+import { requestLoggingMiddleware } from "./common/request/request-logging.middleware";
 import type { ServerEnv } from "./config/server-env";
 
 async function bootstrap() {
@@ -26,6 +26,7 @@ async function bootstrap() {
     credentials: true,
   });
   app.use(requestIdMiddleware);
+  app.use(requestLoggingMiddleware);
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -35,7 +36,6 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new AppExceptionFilter());
-  app.useGlobalInterceptors(new ResultInterceptor());
   setupOpenApi(app);
   await app.listen(port);
 }

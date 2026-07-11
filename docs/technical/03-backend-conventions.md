@@ -115,42 +115,57 @@ Rules:
 - Swagger UI at `/api/docs`, OpenAPI JSON at `/api/openapi.json`.
 - No shared contracts package. No backend domain objects in the frontend.
 
-## 6. Result Envelope
+## 6. Response Shape
 
-The global `ResultInterceptor` wraps every success response:
+Success and failure responses are shaped differently on purpose:
 
-```json
-{ "code": "SUCCESS", "message": "Success", "data": {}, "traceId": "request-id" }
-```
-
-- Controllers return business data directly.
-- For a custom success code, return a `ResultBody`-shaped object
-  (`{ code, message, data }`).
-- Never return Drizzle rows as `data`.
+- **Success (2xx):** controllers return the DTO/business data directly — no
+  envelope, no wrapping. The response body is exactly the shape of the
+  returned data. Document it with plain `@ApiOkResponse({ type: ... })`.
+  Never return Drizzle rows as the response.
+- **Failure (4xx/5xx):** the global `AppExceptionFilter` wraps every error into
+  the same `ResultBody` shape (`{ code, message, data }`), whether it came from
+  `AppException` or a built-in Nest `HttpException` — see §7.
+- **Trace ID:** not part of either body. Every response (success or failure)
+  carries it via the `x-request-id` response header instead — see §8.
 
 ## 7. Errors
 
-Use `AppException` for business errors:
+Use `AppException` for business errors. It takes an `ErrorCode`
+(`{ code, message, status }`, see `src/common/exceptions/error-code.ts`) plus
+optional `data`; each module declares its own error codes via `defineErrorCodes`
+(not a TS `enum` — an `enum` can only hold a primitive, not a bundled
+status/message). `defineErrorCodes` derives each entry's `code` from its object
+key, so it can never drift from or duplicate another entry's code:
 
 ```ts
-throw AppException.notFound("USER_NOT_FOUND", "User not found");
-throw AppException.conflict("ENROLLMENT_ALREADY_ACTIVE", "Enrollment already active");
+// modules/system/user/user.errors.ts
+export const UserErrorCode = defineErrorCodes({
+  USER_NOT_FOUND: { message: "User not found", status: HttpStatus.NOT_FOUND },
+  USER_ALREADY_EXISTS: { message: "User already exists", status: HttpStatus.CONFLICT },
+});
+
+throw new AppException(UserErrorCode.USER_NOT_FOUND);
+throw new AppException(UserErrorCode.USER_ALREADY_EXISTS, { email });
 ```
 
 Rules:
 
 1. Codes are short and human-readable (`USER_NOT_FOUND`).
-2. No global enum of every error code; modules keep local code files.
-3. `AppException` carries the correct HTTP status.
+2. No global enum of every error code; modules keep local error-code files.
+3. Each `ErrorCode` entry carries its own HTTP status; `AppException` just reads it.
 4. Built-in NestJS exceptions are fine for generic HTTP errors; the global filter
    normalizes both into the same envelope (`data: null`).
-5. Validation errors return `code: "VALIDATION_ERROR"` with
+5. Validation errors use `CommonErrorCode.VALIDATION_ERROR`
+   (`src/common/exceptions/common-error-code.ts`) with
    `data.fields: [{ field, message }]`.
 
 ## 8. Trace ID
 
 Every request has a `traceId`: the API reads `x-request-id` or generates one, and
-returns it in both the response header and body. This is the phase-1 debugging
+returns it on the `x-request-id` response header of every response. Failure
+bodies also echo it (part of the `AppExceptionFilter` envelope, see §6); success
+bodies don't carry it since they're unwrapped. This is the phase-1 debugging
 story — no observability stack yet.
 
 ## 9. Configuration

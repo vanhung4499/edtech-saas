@@ -1,16 +1,24 @@
 import { BadRequestException, HttpStatus, NotFoundException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
 import { AppException } from "./app.exception";
+import { defineErrorCodes } from "./error-code";
 import { normalizeException } from "./exception-normalizer";
 
+// Stand-in for a module-local error code registry, e.g. `modules/system/user/user.errors.ts`.
+const UserErrorCode = defineErrorCodes({
+  USER_NOT_FOUND: {
+    message: "User not found",
+    status: HttpStatus.NOT_FOUND,
+  },
+  USER_ALREADY_EXISTS: {
+    message: "User already exists",
+    status: HttpStatus.CONFLICT,
+  },
+});
+
 describe("AppException", () => {
-  it("keeps business code, message, status, and data", () => {
-    const exception = new AppException({
-      code: "USER_NOT_FOUND",
-      message: "User not found",
-      status: HttpStatus.NOT_FOUND,
-      data: { id: "user-1" },
-    });
+  it("keeps business code, message, status, and data from the error code", () => {
+    const exception = new AppException(UserErrorCode.USER_NOT_FOUND, { id: "user-1" });
 
     expect(exception.getStatus()).toBe(HttpStatus.NOT_FOUND);
     expect(exception.getAppResponse()).toEqual({
@@ -20,22 +28,22 @@ describe("AppException", () => {
     });
   });
 
-  it("provides named factories for common business HTTP statuses", () => {
-    expect(AppException.notFound("USER_NOT_FOUND", "User not found").getStatus()).toBe(
-      HttpStatus.NOT_FOUND,
-    );
-    expect(AppException.badRequest("INVALID_INPUT", "Invalid input").getStatus()).toBe(
-      HttpStatus.BAD_REQUEST,
-    );
-    expect(AppException.conflict("USER_ALREADY_EXISTS", "User already exists").getStatus()).toBe(
+  it("defaults data to null when not provided", () => {
+    const exception = new AppException(UserErrorCode.USER_NOT_FOUND);
+
+    expect(exception.getAppResponse().data).toBeNull();
+  });
+
+  it("carries whichever HTTP status the error code declares", () => {
+    expect(new AppException(UserErrorCode.USER_NOT_FOUND).getStatus()).toBe(HttpStatus.NOT_FOUND);
+    expect(new AppException(UserErrorCode.USER_ALREADY_EXISTS).getStatus()).toBe(
       HttpStatus.CONFLICT,
     );
-    expect(AppException.forbidden("NO_PERMISSION", "No permission").getStatus()).toBe(
-      HttpStatus.FORBIDDEN,
-    );
-    expect(AppException.unauthorized("LOGIN_REQUIRED", "Login required").getStatus()).toBe(
-      HttpStatus.UNAUTHORIZED,
-    );
+  });
+
+  it("derives each error code's `code` from its registry key", () => {
+    expect(UserErrorCode.USER_NOT_FOUND.code).toBe("USER_NOT_FOUND");
+    expect(UserErrorCode.USER_ALREADY_EXISTS.code).toBe("USER_ALREADY_EXISTS");
   });
 
   it("maps Nest HTTP exceptions to the common error shape", () => {

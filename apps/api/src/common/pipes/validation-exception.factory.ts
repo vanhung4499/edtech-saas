@@ -1,6 +1,6 @@
-import { HttpStatus } from "@nestjs/common";
 import type { ValidationError } from "class-validator";
 import { AppException } from "../exceptions/app.exception";
+import { CommonErrorCode } from "../exceptions/common-error-code";
 
 interface ValidationFieldError {
   field: string;
@@ -8,13 +8,8 @@ interface ValidationFieldError {
 }
 
 export function createValidationException(errors: ValidationError[]) {
-  return new AppException({
-    code: "VALIDATION_ERROR",
-    message: "Validation failed",
-    status: HttpStatus.BAD_REQUEST,
-    data: {
-      fields: flattenValidationErrors(errors),
-    },
+  return new AppException(CommonErrorCode.VALIDATION_ERROR, {
+    fields: flattenValidationErrors(errors),
   });
 }
 
