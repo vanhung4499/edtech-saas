@@ -36,13 +36,13 @@ docker compose up -d
 cp .env.example .env   # then edit as needed
 ```
 
-Database (Drizzle) — root shortcuts filter to `@edtech/database`:
+Database (Drizzle) — root shortcuts filter to `@edtech/api`:
 
 ```bash
 pnpm db:generate      # generate migration from schema changes
 pnpm db:migrate       # apply migrations
 pnpm db:studio        # Drizzle Studio
-pnpm db:seed          # run src/seed.ts
+pnpm db:seed          # run src/database/seed.ts
 ```
 
 Run one workspace/task directly with a filter, e.g.:
@@ -55,20 +55,19 @@ pnpm --filter @edtech/api dev
 Run a single test file or test by name (vitest):
 
 ```bash
-pnpm --filter @edtech/api exec vitest run src/common/result/result.interceptor.spec.ts
-pnpm --filter @edtech/api exec vitest run -t "wraps the response"
+pnpm --filter @edtech/api exec vitest run src/common/exceptions/app.exception.spec.ts
+pnpm --filter @edtech/api exec vitest run -t "keeps business code, message, status, and data"
 ```
 
 Tests are colocated `*.spec.ts` files and run with `--passWithNoTests`.
 
 ## Workspace layout
 
-pnpm workspace + Turbo monorepo. Apps depend on packages via the `workspace:*` protocol and TS path aliases (`@edtech/database`, `@edtech/shared` — see `tsconfig.base.json`).
+pnpm workspace + Turbo monorepo. `apps/api` depends on `packages/shared` via the `workspace:*` protocol and a TS path alias (`@edtech/shared` — see `tsconfig.base.json`; `apps/api/tsconfig.json` also declares a TS project reference to it so cross-package builds/typechecks work under plain `tsc`).
 
-- `apps/api` — NestJS backend: HTTP server (`main.ts`) + BullMQ worker entrypoint (`worker.ts`). Jobs run in-process by default; `worker.ts` can run them as a separate process later without code changes.
+- `apps/api` — NestJS backend: HTTP server (`main.ts`) + BullMQ worker entrypoint (`worker.ts`). Jobs run in-process by default; `worker.ts` can run them as a separate process later without code changes. `src/database/` holds Drizzle schema, client, migrations, and seed (source of DB truth) — colocated here because `apps/api` is its only consumer; never import it from `apps/web`.
 - `apps/web` — Next.js operator console (App Router, Tailwind, React Query, react-hook-form). App-level/shared components live in `apps/web/components/` (no separate UI package until a second frontend exists).
-- `packages/database` — Drizzle schema, client, migrations, seed (source of DB truth); shared by the api HTTP and worker entrypoints.
-- `packages/shared` — framework-free cross-cutting logic (e.g. `Money`); must not import NestJS/Next.js/Drizzle.
+- `packages/shared` — framework-free cross-cutting logic (e.g. `Money`); must not import NestJS/Next.js/Drizzle. CommonJS (not ESM) — its only consumers are `apps/api` (CJS-only, NestJS decorator metadata) and `apps/web` (bundler-agnostic either way), so there's no benefit to ESM here; revisit only if this package is ever published outside the monorepo.
 
 API runtime env lives in `apps/api/src/config/server-env.ts` (zod schema), wired via `ConfigModule.forRoot({ validate })` in `app.module.ts`.
 
@@ -89,9 +88,9 @@ Wired globally in `src/main.ts`; details in `docs/technical/03-backend-conventio
 - Global prefix `api` + URI versioning (`defaultVersion: "1"`) → phase-1 routes live under `/api/v1`. Health: `/api/v1/health`.
 - OpenAPI: Swagger UI at `/api/docs`, JSON at `/api/openapi.json`. NestJS DTO classes are the source of truth for REST contracts — there is deliberately no shared request/response contracts package; the web app consumes generated types from OpenAPI.
 - DTO naming: `*.request.ts` / `*.response.ts`, validated with `class-validator`, transformed with `class-transformer`. Common DTOs in `src/common/dto`.
-- **`ResultInterceptor`** wraps every success response as `{ code, message, data, traceId }`. Controllers return business data directly, or a `ResultBody`-shaped object for a custom code/message. Never return Drizzle rows as `data`.
-- **`AppException`** (`AppException.notFound(...)`, `.conflict(...)`, etc.) for business errors; the global filter normalizes both it and built-in Nest exceptions into the same shape. Error codes are short and human-readable (`USER_NOT_FOUND`); do not build one global enum of all codes — modules keep their own local code files.
-- **Trace ID:** every request has a `traceId` (reads `x-request-id` or generates one, echoed in header + body).
+- **Response shape:** success (2xx) responses are never wrapped — controllers return the DTO/business data directly, documented with plain `@ApiOkResponse({ type: ... })`. Never return Drizzle rows as the response. Only failures (4xx/5xx) go through an envelope.
+- **`AppException`** for business errors: `throw new AppException(SomeErrorCode.X, data?)`, where `SomeErrorCode` is a module-local registry built with `defineErrorCodes({ ... })` (`src/common/exceptions/error-code.ts`) — never a TS `enum` (can't bundle status + message), never one global enum of all codes. The global `AppExceptionFilter` normalizes both `AppException` and built-in Nest exceptions into the same `{ code, message, data }` shape, and logs the full stack trace for any 5xx (`src/common/exceptions/app-exception.filter.ts`).
+- **Trace ID:** every request has a `traceId` (reads `x-request-id` or generates one). Always on the `x-request-id` response header; also echoed in failure response bodies (not success bodies, which are unwrapped). A separate access-log middleware logs one line per request (method, path, status, duration, traceId).
 - **Transactions:** open explicit Drizzle transactions at the service (light) / application (heavy) boundary — never in controllers. Keep them short; no slow external calls inside; publish events after commit.
 - **Config:** never read `process.env` in feature modules. Add runtime env to `src/config/server-env.ts` (zod schema `ServerEnv`), read via `ConfigService<ServerEnv, true>`, and keep `.env.example` in sync. Env is loaded from repo root or app folder (`../../.env(.local)`, `./.env(.local)`).
 

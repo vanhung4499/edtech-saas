@@ -5,7 +5,7 @@ Use when adding or changing persisted data.
 ## Steps
 
 1. Identify the owning module; add or update the table in
-   `packages/database/src/schema/<module>.ts` (apps never define tables).
+   `apps/api/src/database/schema/<module>.ts` (apps never define tables).
 2. Spread the shared column helpers: `tenantColumn` (every business table),
    `branchColumn` (operational tables), `softDeleteColumn` (master data),
    `timestampColumns`.

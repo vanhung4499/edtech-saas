@@ -1,7 +1,8 @@
 import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { idColumn } from "./columns";
 
 export const tenantsTable = pgTable("system_tenants", {
-  id: uuid("id").primaryKey().defaultRandom(),
+  id: idColumn(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
   isActive: boolean("is_active").notNull().default(true),
@@ -10,7 +11,7 @@ export const tenantsTable = pgTable("system_tenants", {
 });
 
 export const branchesTable = pgTable("system_branches", {
-  id: uuid("id").primaryKey().defaultRandom(),
+  id: idColumn(),
   tenantId: uuid("tenant_id")
     .notNull()
     .references(() => tenantsTable.id),

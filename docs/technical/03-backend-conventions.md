@@ -26,7 +26,7 @@ module/
 ```
 
 Table definitions do **not** live in the module: all Drizzle schema lives in
-`packages/database/src/schema/<module>.ts` (`05-database-and-migrations.md`).
+`apps/api/src/database/schema/<module>.ts` (`05-database-and-migrations.md`).
 Ownership is logical — only the owning module's repositories may query its
 tables.
 
@@ -40,7 +40,7 @@ module/
   infrastructure/   repositories, mappers, provider adapters
 ```
 
-(Heavy modules follow the same rule: tables live in `packages/database`.)
+(Heavy modules follow the same rule: tables live in `apps/api/src/database`.)
 
 Layer responsibilities:
 

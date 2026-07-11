@@ -195,7 +195,7 @@ recorded against a scheduling session id.
   reschedule, cancel, place makeup, assign substitute), transaction boundary,
   events.
 - `infrastructure/`: repositories; tables in
-  `packages/database/src/schema/scheduling.ts`.
+  `apps/api/src/database/schema/scheduling.ts`.
 
 ## 13. Testing Requirements
 

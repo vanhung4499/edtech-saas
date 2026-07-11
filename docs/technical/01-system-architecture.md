@@ -70,10 +70,10 @@ without code changes.
 ```txt
 apps/
   api/        NestJS backend — HTTP (main.ts) + worker entrypoint (worker.ts)
+              src/database/ — Drizzle schema, client, migrations, seed (DB source of truth)
   web/        Next.js operator console
 
 packages/
-  database/   Drizzle schema, client, migrations, seed  (DB source of truth)
   shared/     framework-free logic shared by api and web (e.g. Money)
 ```
 
@@ -83,8 +83,8 @@ Rules:
    `tsconfig.base.json`.
 2. `packages/shared` must stay dependency-light and framework-free. Nothing in it
    may import NestJS, Next.js, or Drizzle.
-3. `packages/database` is the only place schema is defined. Apps never define
-   tables.
+3. `apps/api/src/database` is the only place schema is defined — `apps/web` and
+   any future app never define tables or touch the database directly.
 4. There is deliberately **no shared API-contracts package**. The web app consumes
    generated types from the API's OpenAPI schema (`07-frontend.md`).
 

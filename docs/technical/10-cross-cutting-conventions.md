@@ -98,7 +98,7 @@ compensating records (`06-finance.md`). Deleting a payment is forbidden, not
 ### 4.2 Master / operational data (person, program, class, room, role, ...)
 
 Uniform soft delete via a shared `softDeleteColumn` helper
-(`packages/database/src/schema/columns.ts`):
+(`apps/api/src/database/schema/columns.ts`):
 
 1. Delete = set `deleted_at` (+ audit row, same tx). Restore = set null
    (+ audit row). Both permission-guarded.

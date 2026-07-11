@@ -1,4 +1,4 @@
-import { createDatabaseClient, tenantsTable } from "./index.js";
+import { createDatabaseClient, tenantsTable } from "./index";
 
 async function seed() {
   const db = createDatabaseClient();

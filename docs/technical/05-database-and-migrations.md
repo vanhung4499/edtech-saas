@@ -13,7 +13,9 @@ Drizzle is the persistence and query layer. Tables are persistence schema; rows
 are persistence records. Neither is a domain entity — that separation is the
 main reason Drizzle was chosen over Prisma.
 
-All schema lives in `packages/database/src/schema/`. Apps never define tables.
+All schema lives in `apps/api/src/database/schema/` — colocated with the only
+app that touches the database directly; `apps/web` never defines tables or
+queries the database.
 
 ## 2. Table Conventions
 
@@ -27,7 +29,7 @@ Every table:
 export const enrollmentsTable = pgTable(
   "academic_enrollments",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: idColumn(),            // UUIDv7, see schema/columns.ts
     ...tenantColumn,          // every business table
     ...branchColumn,          // operational tables
     // domain columns...
@@ -45,7 +47,10 @@ export type NewEnrollmentRow = typeof enrollmentsTable.$inferInsert;
 
 Rules:
 
-1. `uuid` primary keys with `defaultRandom()`.
+1. `id: idColumn()` (`schema/columns.ts`) — UUIDv7, generated app-side via
+   `$defaultFn`, not Postgres's `gen_random_uuid()` (UUIDv4): UUIDv7 keeps
+   B-tree insert locality (time-ordered) without the enumeration risk an
+   auto-increment PK would have on a multi-tenant table.
 2. Timestamps are `timestamptz`; every table has `created_at` / `updated_at`.
 3. Tenant/branch/index/unique rules come from `04-tenancy-and-data-scope.md`
    (indexes lead with `tenant_id`; uniques are per tenant).
@@ -71,7 +76,7 @@ Rules:
 pnpm db:generate    # drizzle-kit generate — after schema changes
 pnpm db:migrate     # apply, runs as owner (DATABASE_MIGRATE_URL)
 pnpm db:studio      # inspect
-pnpm db:seed        # packages/database/src/seed.ts
+pnpm db:seed        # apps/api/src/database/seed.ts
 ```
 
 Rules:

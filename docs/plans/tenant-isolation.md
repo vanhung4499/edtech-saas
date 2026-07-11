@@ -19,7 +19,7 @@ established pattern.
 
 ## 2. Current State (what this plan builds on)
 
-- `packages/database`: `client.ts` (pool from `DATABASE_URL`), `schema/system.ts`
+- `apps/api/src/database`: `client.ts` (pool from `DATABASE_URL`), `schema/system.ts`
   (`system_tenants`, `system_branches`), one migration, seed script.
 - `apps/api`: pipeline wired in `main.ts` (result/exception/validation/traceId),
   `AppModule` has only `ConfigModule` + health. No auth, no db wiring yet.
@@ -29,12 +29,12 @@ established pattern.
 
 ## 3. Work Breakdown
 
-Steps are ordered; each has its own commit and done-check. Steps 1–3 are
-`packages/database` only; 4–5 are `apps/api`; 6 is worker; 7 is tests.
+Steps are ordered; each has its own commit and done-check. Steps 1–3 touch
+`apps/api/src/database` only; 4–5 touch the rest of `apps/api`; 6 is worker; 7 is tests.
 
 ### Step 1: Database roles + env split
 
-- Add `packages/database/scripts/bootstrap-roles.sql`: create `edtech_app`
+- Add `apps/api/src/database/scripts/bootstrap-roles.sql`: create `edtech_app`
   (login, `nosuperuser`, `nobypassrls`), grants + default privileges as in the
   design doc.
 - Mount it in `docker-compose.yml` under `/docker-entrypoint-initdb.d/` so a
@@ -52,7 +52,7 @@ Done: fresh `docker compose up -d` + `pnpm db:migrate` + `pnpm db:seed` works;
 
 ### Step 2: Schema helpers + branch unique fix
 
-- Add `packages/database/src/schema/columns.ts`: `tenantColumn`, `branchColumn`,
+- Add `apps/api/src/database/schema/columns.ts`: `tenantColumn`, `branchColumn`,
   `timestampColumns` (per design doc).
 - Refactor `schema/system.ts` to use the helpers.
 - Change `system_branches`: drop global `unique(code)`, add
@@ -63,7 +63,7 @@ Done: migration applies from zero; two tenants can share a branch code.
 
 ### Step 3: RLS enablement
 
-- Add `packages/database/src/tenant-rls.ts`: `enableTenantRls(table)` SQL helper
+- Add `apps/api/src/database/tenant-rls.ts`: `enableTenantRls(table)` SQL helper
   (enable + force + `tenant_isolation` policy on `tenant_id`).
 - Custom SQL migration:
   - `system_branches`: standard tenant policy.
@@ -78,9 +78,9 @@ Done: migration applies from zero; two tenants can share a branch code.
 Done: as `edtech_app` without the GUC, `select * from system_branches` returns
 zero rows; with `set_config` it returns only that tenant's rows.
 
-### Step 4: Tenant unit of work in `packages/database`
+### Step 4: Tenant unit of work in `apps/api/src/database`
 
-- Add `packages/database/src/tenant.ts`: `withTenant(db, tenantId, fn)` opening a
+- Add `apps/api/src/database/tenant.ts`: `withTenant(db, tenantId, fn)` opening a
   transaction and setting `app.tenant_id` via `set_config(..., true)` (design doc
   section 6.3). Export `TenantTx` type.
 - Export from `src/index.ts`.
@@ -128,7 +128,7 @@ Done: worker skeleton compiles with the wrapper in place; rule documented.
 
 ### Step 7: Isolation test suite (the point of the whole plan)
 
-`packages/database/src/tenant-isolation.spec.ts` (vitest, integration — needs
+`apps/api/src/database/tenant-isolation.spec.ts` (vitest, integration — needs
 Postgres from docker compose; connects as `edtech_app` via `DATABASE_URL`,
 seeds via `DATABASE_MIGRATE_URL`):
 

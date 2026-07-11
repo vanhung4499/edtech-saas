@@ -47,7 +47,7 @@ Rules:
 ## 4. Schema Conventions
 
 Every tenant-owned table spreads the shared column helpers
-(`packages/database/src/schema/columns.ts`):
+(`apps/api/src/database/schema/columns.ts`):
 
 ```ts
 export const tenantColumn = {
@@ -142,7 +142,7 @@ Set the GUC transaction-locally — never session-level `SET`, which leaks acros
 pooled connections:
 
 ```ts
-// packages/database/src/tenant.ts
+// apps/api/src/database/tenant.ts
 export async function withTenant<T>(db: Db, tenantId: string, fn: (tx: TenantTx) => Promise<T>) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select set_config('app.tenant_id', ${tenantId}, true)`);

@@ -29,7 +29,7 @@ module/
       thing.mapper.ts
 ```
 
-Tables live in `packages/database/src/schema/<module>.ts`, not in the module.
+Tables live in `apps/api/src/database/schema/<module>.ts`, not in the module.
 Only this module's repositories may query its tables.
 
 ## Rules

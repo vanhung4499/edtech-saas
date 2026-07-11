@@ -11,10 +11,10 @@
     "test": "turbo test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:generate": "pnpm --filter @edtech/database db:generate",
-    "db:migrate": "pnpm --filter @edtech/database db:migrate",
-    "db:studio": "pnpm --filter @edtech/database db:studio",
-    "db:seed": "pnpm --filter @edtech/database db:seed"
+    "db:generate": "pnpm --filter @edtech/api db:generate",
+    "db:migrate": "pnpm --filter @edtech/api db:migrate",
+    "db:studio": "pnpm --filter @edtech/api db:studio",
+    "db:seed": "pnpm --filter @edtech/api db:seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

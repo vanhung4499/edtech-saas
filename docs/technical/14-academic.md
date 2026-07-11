@@ -198,7 +198,7 @@ Heavy-module placement (`03-backend-conventions.md`):
 - `application/`: use cases (enroll, bulk-enroll, transfer, hold, resume,
   complete), transaction boundary via `Database.run`, audit + event publication.
 - `infrastructure/`: repositories, mappers; tables in
-  `packages/database/src/schema/academic.ts`.
+  `apps/api/src/database/schema/academic.ts`.
 
 **Sequencing note:** attendance and makeup need `scheduling` sessions
 (phase 3) but academic is phase 2. Phase 2 builds catalog + class + enrollment
