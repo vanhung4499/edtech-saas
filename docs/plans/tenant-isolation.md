@@ -58,10 +58,21 @@ established pattern.
   a temporary route manually calling `TenantContext.run(scope, () =>
   database.run(...))` round-tripped a real RLS-scoped query end to end through
   the whole HTTP pipeline.
-- worker runs as an `apps/api` entrypoint (`worker.ts`), in-process by default; no queue processing yet.
-- Remaining gap vs design: no worker tenant-context propagation yet (Step 6);
-  no auth, so `tenant-context.middleware.ts` never actually populates context
-  on a real request yet — that lands with auth (next plan).
+- worker runs as an `apps/api` entrypoint (`worker.ts`), in-process by default;
+  no queue processing yet. `common/tenant/tenant-job.ts`'s `runTenantJob(database,
+  jobData, handler)` is the worker-side counterpart to
+  `tenant-context.middleware.ts` — re-establishes `TenantContext` from
+  `jobData.__ctx.tenantId` (fails closed if missing) and runs `handler`
+  through `database.run(...)`, so business logic shared between HTTP and jobs
+  sees the same `TenantContext`/`Database.run` regardless of which one called
+  it. Step 6 done — unit tested (`tenant-job.spec.ts`, no live queue needed:
+  fail-closed on missing `__ctx.tenantId`; correct tenant established and
+  cleared around the handler; handler runs through `database.run`). No real
+  BullMQ producer/processor exists yet, so this is deliberately just the
+  pattern in place, not wired to a live queue.
+- Remaining gap vs design: no auth, so `tenant-context.middleware.ts` never
+  actually populates context on a real request yet — that lands with auth
+  (next plan). Step 7 (isolation test suite) is what's left of this plan.
 
 ## 3. Work Breakdown
 
