@@ -45,7 +45,7 @@ Read in order. Each document answers one question.
 | [04-tenancy-and-data-scope.md](./04-tenancy-and-data-scope.md)   | How are tenants isolated and data access scoped?     |
 | [05-database-and-migrations.md](./05-database-and-migrations.md) | How are schema, migrations, and queries handled?     |
 | [06-finance.md](./06-finance.md)                                 | How is money represented, moved, and integrated?     |
-| [07-frontend.md](./07-frontend.md)                               | How is the operator console built against the API?   |
+| [07-frontend.md](./07-frontend.md)                               | Frontend architecture: rendering, data, auth, tables, design tokens |
 | [08-roadmap.md](./08-roadmap.md)                                 | What gets built in which order?                      |
 | [09-auth-and-authorization.md](./09-auth-and-authorization.md)   | How do users log in, and what may they do and see?   |
 | [10-cross-cutting-conventions.md](./10-cross-cutting-conventions.md) | Events, audit, deletion, time, language — the shared rules |
