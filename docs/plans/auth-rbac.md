@@ -2,7 +2,7 @@
 
 | Field        | Value                                                      |
 | ------------ | ----------------------------------------------------------- |
-| Status       | Ready after tenant-isolation plan lands                    |
+| Status       | In progress — step 1 of 9 done                             |
 | Date         | 2026-07-06                                                 |
 | Scope        | Implement `docs/technical/09-auth-and-authorization.md`    |
 | Depends on   | `docs/plans/tenant-isolation.md` (steps 1–5 must be done)  |
@@ -44,6 +44,25 @@ Tables per design doc 4.3: `system_users`, `system_roles`,
 
 Done: migration applies from zero; seeded rows visible under
 `withTenant(devTenant)` and invisible without context.
+
+**Status: done.** Migrations `0004_system_auth_tables` (schema) and
+`0005_enable_rls_system_auth_tables` (RLS on the 7 tenant-scoped tables, via
+`enableTenantRls`) applied cleanly from zero against a real local Postgres.
+`platform_admins` explicitly `revoke all ... from edtech_app` in the same
+migration — migration 0000's `alter default privileges` would otherwise have
+silently granted it blanket DML like every other future table; verified
+`edtech_app` gets `permission denied for table platform_admins` even with a
+valid tenant GUC set (a hard grant-level denial, not RLS — there's no
+`tenant_id` on this table for RLS to key off). Seed produces 1 tenant, 2
+branches, 5 enabled tenant modules, Owner + Admin roles (`is_system: true`),
+1 Owner user (`must_change_password: true`), 1 platform admin — all
+argon2id-hashed, all idempotent on re-run (select-or-insert per entity, not
+`onConflictDoNothing`, since later steps need the ids either way). Verified
+`edtech_app` sees zero rows on `system_users`/`system_roles` without tenant
+context, and exactly the seeded rows with the correct tenant GUC set.
+Admin role intentionally has zero `system_role_permissions` rows for now —
+assigning specific keys means guessing step 2's registry format before it
+exists.
 
 ### Step 2: Permission registry + decorators
 
