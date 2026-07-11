@@ -3,8 +3,8 @@ import { and, eq } from "drizzle-orm";
 import {
   branchesTable,
   createDatabaseClient,
+  moduleEntitlementsTable,
   rolesTable,
-  tenantModulesTable,
   tenantsTable,
   userRolesTable,
   usersTable,
@@ -72,19 +72,22 @@ async function seedBranches(db: Db, tenantId: string) {
   return [main, second];
 }
 
-async function seedTenantModules(db: Db, tenantId: string) {
+async function seedModuleEntitlements(db: Db, tenantId: string) {
   for (const moduleKey of ALL_MODULE_KEYS) {
     await findOrInsert(
       () =>
         db
           .select()
-          .from(tenantModulesTable)
+          .from(moduleEntitlementsTable)
           .where(
-            and(eq(tenantModulesTable.tenantId, tenantId), eq(tenantModulesTable.moduleKey, moduleKey)),
+            and(
+              eq(moduleEntitlementsTable.tenantId, tenantId),
+              eq(moduleEntitlementsTable.moduleKey, moduleKey),
+            ),
           ),
       () =>
         db
-          .insert(tenantModulesTable)
+          .insert(moduleEntitlementsTable)
           .values({ tenantId, moduleKey, enabled: true })
           .returning(),
     );
@@ -181,7 +184,7 @@ async function seed() {
 
   const tenant = await seedTenant(db);
   await seedBranches(db, tenant.id);
-  await seedTenantModules(db, tenant.id);
+  await seedModuleEntitlements(db, tenant.id);
   const { owner } = await seedRoles(db, tenant.id);
   await seedOwnerUser(db, tenant.id, owner.id);
   await seedPlatformAdmin(db);

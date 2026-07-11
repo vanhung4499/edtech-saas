@@ -155,8 +155,14 @@ export const userBranchesTable = pgTable(
   }),
 );
 
-export const tenantModulesTable = pgTable(
-  "system_tenant_modules",
+// "Entitlement" (not "tenant module"): a commercial/platform fact about what
+// the tenant bought, not something a tenant admin can self-service — see
+// 09-auth-and-authorization.md §5 (platform provisioning sets this) vs §7
+// (platform ops don't use tenant RBAC). "module" stays in the name on
+// purpose: this table is only ever about module-level access, not a general
+// entitlement store.
+export const moduleEntitlementsTable = pgTable(
+  "system_module_entitlements",
   {
     id: idColumn(),
     ...tenantColumn,
@@ -167,7 +173,7 @@ export const tenantModulesTable = pgTable(
     ...timestampColumns,
   },
   (t) => ({
-    tenantModuleUnique: unique("system_tenant_modules_tenant_id_module_key_unique").on(
+    tenantModuleUnique: unique("system_module_entitlements_tenant_id_module_key_unique").on(
       t.tenantId,
       t.moduleKey,
     ),
@@ -215,8 +221,8 @@ export type UserRoleRow = typeof userRolesTable.$inferSelect;
 export type NewUserRoleRow = typeof userRolesTable.$inferInsert;
 export type UserBranchRow = typeof userBranchesTable.$inferSelect;
 export type NewUserBranchRow = typeof userBranchesTable.$inferInsert;
-export type TenantModuleRow = typeof tenantModulesTable.$inferSelect;
-export type NewTenantModuleRow = typeof tenantModulesTable.$inferInsert;
+export type ModuleEntitlementRow = typeof moduleEntitlementsTable.$inferSelect;
+export type NewModuleEntitlementRow = typeof moduleEntitlementsTable.$inferInsert;
 export type LoginLogRow = typeof loginLogsTable.$inferSelect;
 export type NewLoginLogRow = typeof loginLogsTable.$inferInsert;
 export type PlatformAdminRow = typeof platformAdminsTable.$inferSelect;

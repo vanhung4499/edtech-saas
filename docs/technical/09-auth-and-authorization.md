@@ -104,7 +104,7 @@ unbound connection sees zero rows, including `system_tenants`. The flow is:
 | Permission         | Code registry (not DB)            | What actions exist in the product         |
 | Role               | `system_roles` (tenant-defined)   | Which permission bundle a tenant created  |
 | Data scope         | `system_users` + branch join      | Which rows a user may see                 |
-| Module entitlement | `system_tenant_modules`           | Which product modules the tenant bought   |
+| Module entitlement | `system_module_entitlements`           | Which product modules the tenant bought   |
 
 Role never implies scope (business rule A2). Entitlement never implies
 permission (rule A4) — a tenant may have `finance` enabled while a user has no
@@ -136,7 +136,7 @@ system_roles            id, tenant_id, code, name, is_system
 system_role_permissions role_id, tenant_id, permission_key
 system_user_roles       user_id, role_id, tenant_id
 system_user_branches    user_id, branch_id, tenant_id   (rows only for BRANCH_SET)
-system_tenant_modules   tenant_id, module_key, enabled, effective range
+system_module_entitlements   tenant_id, module_key, enabled, effective range
 system_login_logs       (see 3.5)
 ```
 
@@ -210,7 +210,7 @@ Tenant provisioning (platform path) creates:
 
 - `Owner` role (`is_system`, permission `*`) assigned to the first user
 - `Admin` role (`is_system`, all `system:*` keys) as a starting point
-- all currently-sold modules enabled in `system_tenant_modules`
+- all currently-sold modules enabled in `system_module_entitlements`
 
 Tenants create further roles themselves. `is_system` roles cannot be deleted or
 have their key permissions stripped by tenant admins.

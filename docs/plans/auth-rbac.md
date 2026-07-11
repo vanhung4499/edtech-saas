@@ -2,7 +2,7 @@
 
 | Field        | Value                                                      |
 | ------------ | ----------------------------------------------------------- |
-| Status       | In progress — step 1 of 9 done                             |
+| Status       | In progress — step 2 of 9 done                             |
 | Date         | 2026-07-06                                                 |
 | Scope        | Implement `docs/technical/09-auth-and-authorization.md`    |
 | Depends on   | `docs/plans/tenant-isolation.md` (steps 1–5 must be done)  |
@@ -32,7 +32,7 @@ New dependencies to add in `apps/api`: `argon2`, `ioredis`, `cookie-parser`,
 
 Tables per design doc 4.3: `system_users`, `system_roles`,
 `system_role_permissions`, `system_user_roles`, `system_user_branches`,
-`system_tenant_modules`, `system_login_logs`, plus `platform_admins`
+`system_module_entitlements`, `system_login_logs`, plus `platform_admins`
 (no tenant_id, **no** tenant RLS — platform path only).
 
 - All tenant-scoped tables: `tenantColumn`, tenant-led indexes, per-tenant
@@ -68,7 +68,7 @@ exists.
 
 - `apps/api/src/common/auth/permissions.ts`: aggregated registry; each module
   later contributes `<module>.permissions.ts`. Start with `system:*` keys
-  (user/role/branch/tenant-module management) and the `*` wildcard rule.
+  (user/role/branch/module-entitlement management) and the `*` wildcard rule.
 - `@RequirePermissions(...keys)` and `@Public()` decorators (metadata only
   at this step).
 - Registry unit test: every key matches `module:resource:action` shape; module
@@ -76,6 +76,21 @@ exists.
 
 Done: registry importable by guards, seed (role permissions), and later the
 frontend.
+
+**Status: done.** `common/auth/permissions.ts` has 7 `system:*` keys
+(`user`/`role`/`branch` each with `manage` + `read`, plus
+`module-entitlement:read` only — no `manage` key exists for module
+entitlement, since enabling/disabling a tenant's modules is a platform/billing
+decision, not something a tenant's own Owner can do via RBAC). Renamed
+`system_tenant_modules`/`tenantModulesTable` to
+`system_module_entitlements`/`moduleEntitlementsTable` to make that
+distinction unambiguous in the schema itself, via a new migration (0004/0005
+were already applied). `@RequirePermissions`
+(`common/auth/require-permissions.decorator.ts`) is typed against a
+`PermissionKey` union derived from the registry, not `string` — confirmed a
+typo'd key is a compile error, not a silent always-false check. `@Public()`
+already existed from the tenant-isolation plan (step 5), reused as-is.
+Registry unit test covers key shape, known-module prefixes, no duplicates.
 
 ### Step 3: Session infrastructure
 
@@ -116,7 +131,7 @@ Done: e2e-style specs for the four endpoints against real Postgres+Redis.
 - Extend `tenantContextMiddleware`: when `req.auth` exists, resolve authz and
   populate the full `TenantScope` (until now it only carried ids).
 - `PermissionsGuard`: reads `@RequirePermissions` metadata; checks module
-  entitlement (prefix -> `system_tenant_modules`, cached with authz bundle),
+  entitlement (prefix -> `system_module_entitlements`, cached with authz bundle),
   then permission (`*` honored). Disabled module -> `AppException.notFound`.
 - Route-metadata conformance test: every registered route has
   `@RequirePermissions` or `@Public` (reflection over the router) — this
@@ -132,7 +147,10 @@ Light-module CRUD under `/api/v1/system/`, all permission-guarded:
   (disable destroys sessions), set data scope + branches, assign roles
 - roles: CRUD + set permissions (validated against the registry; `is_system`
   protected)
-- tenant-modules: list/toggle (Owner only)
+- module entitlements: list only (`system:module-entitlement:read`) — enabling
+  or disabling a tenant's modules is a platform/billing decision, not a
+  tenant self-service action; it happens via the platform admin path (step 9),
+  not this endpoint
 
 Every mutation calls the authz cache invalidation from step 5.
 
