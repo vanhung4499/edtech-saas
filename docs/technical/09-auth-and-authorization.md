@@ -151,14 +151,14 @@ possible upgrade; do not build it until a real customer needs it.
 requestId
   -> sessionMiddleware        cookie -> Redis -> req.auth = { userId, tenantId }
     -> tenantContextMiddleware  resolve authz (4.5) -> TenantContext.run(scope)
-      -> AuthGuard / TenantGuard   fail closed; @PublicRoute() opts out
+      -> AuthGuard / TenantGuard   fail closed; @Public() opts out
         -> PermissionsGuard        @RequirePermissions("finance:receivable:read")
                                    checks entitlement (module prefix) + permission
           -> handler
 ```
 
 Controllers declare permissions with `@RequirePermissions(...)`; a route without
-the decorator (and without `@PublicRoute()`) fails closed in review — lint/test
+the decorator (and without `@Public()`) fails closed in review — lint/test
 asserts every route carries one of the two.
 
 ### 4.5 Authorization resolution and caching
@@ -244,7 +244,7 @@ Every platform action is audit-logged with actor and reason
 2. Session: logout kills access; disable-user kills all sessions; cookie
    tampering fails signature check.
 3. Guards fail closed: no session -> 401; missing `@RequirePermissions` +
-   missing `@PublicRoute` -> rejected by the route-metadata test.
+   missing `@Public` -> rejected by the route-metadata test.
 4. Permission and entitlement: role without key -> 403; disabled module -> not
    found; `*` grants all.
 5. Data scope: BRANCH_SET user reads only scoped branches' rows (on top of the

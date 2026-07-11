@@ -35,7 +35,7 @@ Only this module's repositories may query its tables.
 ## Rules
 
 - Interfaces call application use cases; every route carries
-  `@RequirePermissions(...)` or `@PublicRoute()`.
+  `@RequirePermissions(...)` or `@Public()`.
 - Application owns orchestration and the transaction boundary
   (`Database.run(...)`), writes `audit.log(...)` in the same transaction, and
   publishes `DomainEvents` (flushed after commit).

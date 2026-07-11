@@ -8,6 +8,7 @@ import { setupOpenApi } from "./common/openapi/setup-openapi";
 import { createValidationException } from "./common/pipes/validation-exception.factory";
 import { requestIdMiddleware } from "./common/request/request-id.middleware";
 import { requestLoggingMiddleware } from "./common/request/request-logging.middleware";
+import { tenantContextMiddleware } from "./common/tenant/tenant-context.middleware";
 import type { ServerEnv } from "./config/server-env";
 
 async function bootstrap() {
@@ -26,6 +27,7 @@ async function bootstrap() {
     credentials: true,
   });
   app.use(requestIdMiddleware);
+  app.use(tenantContextMiddleware);
   app.use(requestLoggingMiddleware);
   app.useGlobalPipes(
     new ValidationPipe({

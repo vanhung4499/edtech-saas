@@ -27,7 +27,7 @@ Only this module's repositories may query its tables.
 
 - Controller parses request and returns response DTO.
 - Every route carries `@RequirePermissions("module:resource:action")` or an
-  explicit `@PublicRoute()`.
+  explicit `@Public()`.
 - Service owns simple use case logic; tenant-scoped work runs inside
   `Database.run(...)` (tenant-bound transaction, RLS active).
 - Repositories still filter by tenant and apply branch scope

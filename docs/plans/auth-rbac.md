@@ -50,7 +50,7 @@ Done: migration applies from zero; seeded rows visible under
 - `apps/api/src/common/auth/permissions.ts`: aggregated registry; each module
   later contributes `<module>.permissions.ts`. Start with `system:*` keys
   (user/role/branch/tenant-module management) and the `*` wildcard rule.
-- `@RequirePermissions(...keys)` and `@PublicRoute()` decorators (metadata only
+- `@RequirePermissions(...keys)` and `@Public()` decorators (metadata only
   at this step).
 - Registry unit test: every key matches `module:resource:action` shape; module
   prefixes come from the known module list.
@@ -100,7 +100,7 @@ Done: e2e-style specs for the four endpoints against real Postgres+Redis.
   entitlement (prefix -> `system_tenant_modules`, cached with authz bundle),
   then permission (`*` honored). Disabled module -> `AppException.notFound`.
 - Route-metadata conformance test: every registered route has
-  `@RequirePermissions` or `@PublicRoute` (reflection over the router) — this
+  `@RequirePermissions` or `@Public` (reflection over the router) — this
   is the "fail closed in review" enforcement.
 
 Done: guard test matrix (no session / no permission / disabled module / `*`).

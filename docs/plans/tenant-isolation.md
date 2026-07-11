@@ -43,10 +43,25 @@ established pattern.
   applied via `0003_fix_rls_pooled_connection_guc_revert`. This would have
   been caught by step 7's pool-reuse test either way, but surfaced naturally
   while building step 4.
-- `apps/api`: pipeline wired in `main.ts` (result/exception/validation/traceId),
-  `AppModule` has only `ConfigModule` + health. No auth, no db wiring yet.
+- `apps/api`: pipeline wired in `main.ts`
+  (result/exception/validation/traceId/tenantContext), `AppModule` has
+  `ConfigModule` + `DatabaseModule` (global) + health, global `TenantGuard` via
+  `APP_GUARD`. `common/tenant/` has `tenant-context.ts` (AsyncLocalStorage),
+  `tenant-context.middleware.ts` (reads `req.auth` — always empty until auth
+  exists, so it's a pass-through for now), `tenant.guard.ts` +
+  `public.decorator.ts`, `tenant.errors.ts`. `common/database/` has
+  `db.provider.ts` + `database.service.ts` (`Database.run(fn)` =
+  `withTenant(db, TenantContext.tenantId(), fn)`) + `database.module.ts`.
+  Step 5 done, verified against a real running api process (`edtech_app`
+  connection): `GET /api/v1/health` (`@Public()`) still 200s; a temporary
+  guarded route with no tenant context returned `401 TENANT_CONTEXT_REQUIRED`;
+  a temporary route manually calling `TenantContext.run(scope, () =>
+  database.run(...))` round-tripped a real RLS-scoped query end to end through
+  the whole HTTP pipeline.
 - worker runs as an `apps/api` entrypoint (`worker.ts`), in-process by default; no queue processing yet.
-- Remaining gap vs design: no tenant context at the API layer yet (Step 5).
+- Remaining gap vs design: no worker tenant-context propagation yet (Step 6);
+  no auth, so `tenant-context.middleware.ts` never actually populates context
+  on a real request yet — that lands with auth (next plan).
 
 ## 3. Work Breakdown
 
@@ -119,8 +134,8 @@ New files under `apps/api/src/common/tenant/`:
   claims). Until auth exists, `req.auth` is simply never set; the middleware
   passes through. **No dev header fallback** — the design doc forbids raw-header
   tenant ids, and a temporary one would outlive its welcome.
-- `tenant.guard.ts` + `public-route.decorator.ts` — global guard, fail closed;
-  `@PublicRoute()` on health (and future login/provisioning).
+- `tenant.guard.ts` + `public.decorator.ts` — global guard, fail closed;
+  `@Public()` on health (and future login/provisioning).
 
 New files under `apps/api/src/common/database/`:
 
