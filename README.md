@@ -20,15 +20,12 @@ Vietnam-focused SaaS for private education center operations.
 
 ```txt
 apps/
-  web/
-  api/
-  worker/
+  api/        NestJS backend — HTTP (main.ts) + worker entrypoint (worker.ts)
+  web/        Next.js operator console
 
 packages/
-  database/
-  shared/
-  ui/
-  config/
+  database/   Drizzle schema, client, migrations, seed
+  shared/     framework-free logic shared by api and web (e.g. Money)
 ```
 
 ## First Commands

@@ -15,8 +15,7 @@
     "baseUrl": ".",
     "paths": {
       "@edtech/database": ["packages/database/src/index.ts"],
-      "@edtech/shared": ["packages/shared/src/index.ts"],
-      "@edtech/ui": ["packages/ui/src/index.ts"]
+      "@edtech/shared": ["packages/shared/src/index.ts"]
     }
   }
 }

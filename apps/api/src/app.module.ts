@@ -7,6 +7,7 @@ import { HealthController } from "./health.controller";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      cache: true,
       envFilePath: ["../../.env.local", "../../.env", ".env.local", ".env"],
       validate: parseServerEnv,
     }),

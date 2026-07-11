@@ -11,7 +11,7 @@
     "test": "vitest run --passWithNoTests src"
   },
   "devDependencies": {
-    "typescript": "latest",
-    "vitest": "latest"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }

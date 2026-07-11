@@ -63,17 +63,14 @@ Tests are colocated `*.spec.ts` files and run with `--passWithNoTests`.
 
 ## Workspace layout
 
-pnpm workspace + Turbo monorepo. Apps depend on packages via the `workspace:*` protocol and TS path aliases (`@edtech/database`, `@edtech/shared`, `@edtech/ui` — see `tsconfig.base.json`).
+pnpm workspace + Turbo monorepo. Apps depend on packages via the `workspace:*` protocol and TS path aliases (`@edtech/database`, `@edtech/shared` — see `tsconfig.base.json`).
 
-- `apps/api` — NestJS backend (the main surface today)
-- `apps/web` — Next.js operator console (App Router, Tailwind, React Query, react-hook-form)
-- `apps/worker` — BullMQ background worker (Redis)
-- `packages/database` — Drizzle schema, client, migrations, seed (source of DB truth)
-- `packages/shared` — cross-cutting logic (e.g. `Money`); shared with both apps
-- `packages/ui` — shared React components
-- `packages/config` — shared zod-based config helpers
+- `apps/api` — NestJS backend: HTTP server (`main.ts`) + BullMQ worker entrypoint (`worker.ts`). Jobs run in-process by default; `worker.ts` can run them as a separate process later without code changes.
+- `apps/web` — Next.js operator console (App Router, Tailwind, React Query, react-hook-form). App-level/shared components live in `apps/web/components/` (no separate UI package until a second frontend exists).
+- `packages/database` — Drizzle schema, client, migrations, seed (source of DB truth); shared by the api HTTP and worker entrypoints.
+- `packages/shared` — framework-free cross-cutting logic (e.g. `Money`); must not import NestJS/Next.js/Drizzle.
 
-Note `packages/config` is not aliased in `tsconfig.base.json`; the API's runtime env lives in `apps/api/src/config/server-env.ts`, not this package.
+API runtime env lives in `apps/api/src/config/server-env.ts` (zod schema), wired via `ConfigModule.forRoot({ validate })` in `app.module.ts`.
 
 ## Architecture: modular monolith
 

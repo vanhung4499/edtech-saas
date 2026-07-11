@@ -173,7 +173,9 @@ commit) is specified in `10-cross-cutting-conventions.md`.
 
 ## 11. Background Jobs
 
-- BullMQ on Redis; the worker app processes queues.
+- BullMQ on Redis; processors are `@Processor` providers in feature modules,
+  running in-process in `apps/api` by default (`worker.ts` can split them into a
+  separate process later).
 - Job payloads always carry tenant context and are enqueued via the helper in
   `04-tenancy-and-data-scope.md` — never `queue.add` directly for tenant work.
 - Handlers must be idempotent (jobs retry).

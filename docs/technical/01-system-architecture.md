@@ -44,7 +44,7 @@ See `03-backend-conventions.md` section on transactions.
 flowchart TB
     WEB[apps/web: Next.js operator console]
     API[apps/api: NestJS modular monolith]
-    WORKER[apps/worker: BullMQ jobs]
+    WORKER[apps/api worker.ts: BullMQ jobs]
     DB[(PostgreSQL)]
     REDIS[(Redis)]
     OBJ[(S3-compatible storage)]
@@ -60,22 +60,21 @@ flowchart TB
     WORKER --> EXT
 ```
 
-The API and the worker are separate processes sharing `@edtech/database` and the
-same tenant-context rules (`04-tenancy-and-data-scope.md`).
+Jobs run **in-process in `apps/api`** by default; `worker.ts` is a second
+entrypoint of the same app (same modules, same tenant-context rules,
+`04-tenancy-and-data-scope.md`) that can be run as a separate process later
+without code changes.
 
 ## 4. Monorepo Layout
 
 ```txt
 apps/
-  api/        NestJS backend (modular monolith)
+  api/        NestJS backend — HTTP (main.ts) + worker entrypoint (worker.ts)
   web/        Next.js operator console
-  worker/     BullMQ background jobs
 
 packages/
   database/   Drizzle schema, client, migrations, seed  (DB source of truth)
-  shared/     cross-cutting logic usable by web+api+worker (e.g. Money)
-  ui/         shared React components
-  config/     shared zod-based config helpers
+  shared/     framework-free logic shared by api and web (e.g. Money)
 ```
 
 Rules:
@@ -110,7 +109,7 @@ shared packages   ->   system module   ->   business modules
 ### 5.1 Shared packages
 
 Technical capabilities only: response/error model, tenant context, db client,
-queue helpers, money, UI primitives. No product workflows.
+queue helpers, money. No product workflows.
 
 ### 5.2 `system`
 

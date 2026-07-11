@@ -54,8 +54,9 @@ apps/web/src/
 - The `(app)` route group wraps everything in the authenticated shell; the
   `(auth)` group is public.
 - Frontend modules mirror product modules. Each module owns its screens, queries,
-  and forms. Shared primitives live in `@edtech/ui`; app-level composed
-  components (DataTable, PageHeader) in `components/`.
+  and forms. Shared and composed components (DataTable, PageHeader, StatusBadge)
+  live in `apps/web/components/` — no separate UI package until a second frontend
+  exists.
 
 ## 5. API Consumption
 

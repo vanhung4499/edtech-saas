@@ -23,7 +23,7 @@ established pattern.
   (`system_tenants`, `system_branches`), one migration, seed script.
 - `apps/api`: pipeline wired in `main.ts` (result/exception/validation/traceId),
   `AppModule` has only `ConfigModule` + health. No auth, no db wiring yet.
-- `apps/worker`: skeleton only, no queue processing yet.
+- worker runs as an `apps/api` entrypoint (`worker.ts`), in-process by default; no queue processing yet.
 - Known gaps vs design: `system_branches.code` is globally unique (must be
   per-tenant); single `DATABASE_URL` for both runtime and migration; no RLS.
 
@@ -116,11 +116,10 @@ context gets `401 TENANT_CONTEXT_REQUIRED`; api boots with db connected.
 
 ### Step 6: Worker context propagation (minimal now)
 
-- Add `apps/worker/src/tenant-job.ts`: `runTenantJob(jobData, handler)` — reads
-  `__ctx.tenantId`, fails closed if missing, wraps handler in
-  `TenantContext.run` + `withTenant`. (Worker gets its own small copy of the
-  ALS context or imports it from a shared location — decide at implementation;
-  keep `@edtech/shared` framework-free.)
+- Add a `tenant-job.ts` helper in `apps/api` (worker side): `runTenantJob(jobData, handler)`
+  — reads `__ctx.tenantId`, fails closed if missing, wraps handler in
+  `TenantContext.run` + `withTenant`. Worker and HTTP share the same
+  `TenantContext` since they are the same app.
 - The producing-side `enqueue()` helper lands in the api when the api first
   gains a BullMQ producer (no queue producers exist yet). Record that rule here
   so `queue.add` never gets called directly for tenant work.

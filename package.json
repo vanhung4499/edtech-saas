@@ -17,12 +17,12 @@
     "db:seed": "pnpm --filter @edtech/database db:seed"
   },
   "devDependencies": {
-    "@eslint/js": "latest",
-    "eslint": "latest",
-    "eslint-config-prettier": "latest",
-    "prettier": "latest",
-    "turbo": "latest",
-    "typescript": "latest",
-    "typescript-eslint": "latest"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.5",
+    "turbo": "^2.10.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.63.0"
   }
 }
