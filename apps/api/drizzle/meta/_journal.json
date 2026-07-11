@@ -5,8 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783240502515,
-      "tag": "0000_fantastic_jack_power",
+      "when": 1783758854518,
+      "tag": "0000_bootstrap_app_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783758949284,
+      "tag": "0001_system_tenants_and_branches",
       "breakpoints": true
     }
   ]

@@ -19,13 +19,19 @@ established pattern.
 
 ## 2. Current State (what this plan builds on)
 
-- `apps/api/src/database`: `client.ts` (pool from `DATABASE_URL`), `schema/system.ts`
-  (`system_tenants`, `system_branches`), one migration, seed script.
+- `apps/api/src/database`: `client.ts`, `schema/system.ts` (`system_tenants`,
+  `system_branches`), `schema/columns.ts` (`idColumn`, `timestampColumns`,
+  `tenantColumn`, `branchColumn`). Two migrations: `0000_bootstrap_app_role`
+  (custom, creates the `edtech_app` runtime role + grants), then
+  `0001_system_tenants_and_branches` (schema, `system_branches` unique on
+  `(tenant_id, code)`). Steps 1–2 done, verified against a real local Postgres:
+  fresh `docker compose up -d` + `pnpm db:migrate` (owner) + `pnpm db:seed`
+  (owner) all work; `edtech_app` can `select`/`insert`/`update`/`delete` but a
+  `create table` as `edtech_app` fails with `permission denied for schema public`.
 - `apps/api`: pipeline wired in `main.ts` (result/exception/validation/traceId),
   `AppModule` has only `ConfigModule` + health. No auth, no db wiring yet.
 - worker runs as an `apps/api` entrypoint (`worker.ts`), in-process by default; no queue processing yet.
-- Known gaps vs design: `system_branches.code` is globally unique (must be
-  per-tenant); single `DATABASE_URL` for both runtime and migration; no RLS.
+- Remaining gap vs design: no RLS yet (Step 3).
 
 ## 3. Work Breakdown
 

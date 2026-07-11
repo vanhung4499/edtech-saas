@@ -5,6 +5,6 @@ export default defineConfig({
   schema: "./src/database/schema/index.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://edtech:edtech@localhost:5432/edtech",
+    url: process.env.DATABASE_MIGRATE_URL ?? "postgres://edtech:edtech@localhost:5432/edtech",
   },
 });
