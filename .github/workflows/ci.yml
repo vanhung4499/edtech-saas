@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+env:
+  # edtech_app doesn't exist until db:migrate runs 0000_bootstrap_app_role —
+  # matches docker-compose.yml's Postgres service credentials for the owner.
+  DATABASE_URL: postgres://edtech_app:edtech_app@localhost:5432/edtech
+  DATABASE_MIGRATE_URL: postgres://edtech:edtech@localhost:5432/edtech
+  AUTH_SECRET: ci-test-secret-do-not-use-in-production
+  NODE_ENV: test
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: edtech
+          POSTGRES_PASSWORD: edtech
+          POSTGRES_DB: edtech
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U edtech -d edtech"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Runs as the owner role (DATABASE_MIGRATE_URL). The first migration
+      # (0000_bootstrap_app_role) creates the edtech_app runtime role itself —
+      # no separate bootstrap step needed, unlike a docker-init script this
+      # wouldn't need to be (see docs/plans/tenant-isolation.md step 1).
+      - run: pnpm --filter @edtech/api db:migrate
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build

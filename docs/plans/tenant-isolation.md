@@ -2,7 +2,7 @@
 
 | Field      | Value                                                        |
 | ---------- | ------------------------------------------------------------ |
-| Status     | Ready to implement                                           |
+| Status     | Implemented (steps 1–7); CI run itself unverified — see §4    |
 | Date       | 2026-07-06                                                   |
 | Scope      | Implement `docs/technical/04-tenancy-and-data-scope.md`      |
 | Depends on | `docs/technical/04-tenancy-and-data-scope.md`, `05-database-and-migrations.md` |
@@ -193,14 +193,35 @@ tests (part of the "CI running typecheck/lint/test" foundation task).
 Done: suite green locally and in CI; this suite becomes the permanent regression
 gate for every future tenant-owned table.
 
+**Status: done.** `apps/api/src/database/tenant-isolation.spec.ts` implements
+all 6 assertions (uses a `max: 1` pool deliberately, so every query in the file
+is forced through the same physical connection — otherwise test 6, the
+pool-reuse regression, could pass by luck if the pool happened to hand out a
+fresh connection). No standalone "role bootstrap" CI step was needed:
+`0000_bootstrap_app_role` is a normal migration, so `pnpm db:migrate` (as
+owner) creates `edtech_app` itself — this is exactly the payoff of the step 1
+decision to make it a migration instead of a docker-init script. Added
+`.github/workflows/ci.yml` (no CI existed before this): checkout, pnpm/node
+setup, Postgres 16 service container matching `docker-compose.yml`'s
+credentials, `pnpm install --frozen-lockfile`, `db:migrate`, then
+typecheck/lint/test/build. Verified locally: `pnpm test` (root and
+`apps/api`) green with zero manually-exported env vars — added
+`vitest.config.ts` + `vitest.setup.ts` using Node's native
+`process.loadEnvFile` (no new dependency) to load `.env`/`.env.local` the same
+way `main.ts`'s `ConfigModule` does, so integration specs that read
+`process.env` directly work the same as `pnpm dev` once `.env` exists.
+**Not verified**: an actual GitHub Actions run — no local GH Actions runner
+(`act`) available in this environment, so the workflow is reviewed and
+YAML-validated but not executed end to end. Confirm on the first real push.
+
 ## 4. Acceptance Criteria (whole plan)
 
-- [ ] Fresh clone: `docker compose up -d && pnpm db:migrate && pnpm db:seed && pnpm test` all green.
-- [ ] Runtime connects as `edtech_app`; migrations as owner; verified by test 4 above.
-- [ ] All isolation tests in step 7 pass in CI.
-- [ ] `system_branches.code` unique per tenant.
-- [ ] Health route public; guard default-on for everything else.
-- [ ] `.env.example`, `server-env.ts`, and technical docs match the final implementation.
+- [x] Fresh clone: `docker compose up -d && pnpm db:migrate && pnpm db:seed && pnpm test` all green. (Verified against a fresh Postgres volume, not a literal fresh git clone — equivalent in every way that matters here.)
+- [x] Runtime connects as `edtech_app`; migrations as owner; verified by test 4 above.
+- [ ] All isolation tests in step 7 pass in CI. (Passes locally; the actual GitHub Actions run is unverified — no `act` available in this environment.)
+- [x] `system_branches.code` unique per tenant.
+- [x] Health route public; guard default-on for everything else.
+- [x] `.env.example`, `server-env.ts`, and technical docs match the final implementation.
 
 ## 5. Risks / Decisions Taken
 
