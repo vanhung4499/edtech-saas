@@ -4,7 +4,7 @@
 | ---------- | ------------------------------------------------------------------ |
 | Status     | Active                                                             |
 | Date       | 2026-07-06                                                         |
-| Scope      | Authentication, sessions, RBAC, data scope, module entitlement     |
+| Scope      | Authentication, tokens, RBAC, data scope, module entitlement       |
 | Depends on | `04-tenancy-and-data-scope.md`, `02-module-boundaries.md`          |
 
 ## 1. Purpose and Scope
@@ -21,17 +21,37 @@ tokens, parent portal auth.
 
 | Concern            | Decision                                                        |
 | ------------------ | ---------------------------------------------------------------- |
-| Authentication     | Server-side sessions in Redis + httpOnly signed cookie          |
+| Authentication     | Stateless JWT (short access + refresh token), `Authorization: Bearer` |
 | Password hashing   | argon2id                                                        |
 | Authorization      | RBAC with code-defined permission keys + user-level data scope  |
 | Module gating      | Tenant module entitlement, checked via the permission key prefix |
 | Menu visibility    | Derived client-side from permissions (no DB-driven menus in v1) |
 
-**Why sessions instead of JWT:** instant revocation (fire an employee, kill the
-session now), no refresh-token rotation machinery, Redis is already in the
-stack. The operator console is first-party; stateless verification buys nothing
-here. Token-based auth can be added later for mobile/API without changing this
-model.
+**Why stateless JWT (not server-side sessions):** this is a small, first-party
+operator console — only a center's own staff log in, so daily request volume is
+low and there is no public/anonymous traffic. Standard `Bearer`-token JWT is the
+industry-normal choice and the simplest thing that works: no session store, no
+Redis on the auth path, no cookie/CSRF machinery (a `Bearer` header is not
+auto-attached by the browser, so CSRF does not apply and no origin check is
+needed).
+
+The one thing stateless JWT gives up is *server-side revocation of a specific
+token before it expires* — there is no session to delete. This does **not** cost
+us the operationally important cases, because **authorization is resolved from
+the DB on every request** (section 4.5), not carried in the token:
+
+- Firing/disabling a user takes effect immediately: every request re-checks
+  `system_users.status`, and a `DISABLED` user is rejected at once — their live
+  access token stops working on its next call, and `/auth/refresh` refuses to
+  mint a new one.
+- A role or permission change takes effect immediately for the same reason.
+
+What remains bounded by the access-token TTL (~15 min) is only a *leaked access
+token for a still-active user* — mitigated by the short TTL and by keeping the
+token out of durable client storage where practical. If a future requirement
+demands hard per-token logout (e.g. a public API or mobile client), a token
+denylist or a move back to server sessions can be added then without touching
+the authorization model.
 
 ## 3. Authentication
 
@@ -45,21 +65,28 @@ model.
 - `system_users.person_id` (nullable) links staff accounts to `Person` once the
   person module lands. A user is not a person (`docs/business` rule).
 
-### 3.2 Sessions
+### 3.2 Tokens
 
-- Store: Redis. Key `session:<id>` -> `{ userId, tenantId, createdAt, ip, userAgent }`.
-  Sliding TTL 12h, absolute cap 7 days. A per-user index set
-  `user-sessions:<tenantId>:<userId>` enables "log out everywhere".
-- Cookie: `edtech_session`, httpOnly, `SameSite=Lax`, `Secure` in production,
-  signed with `AUTH_SECRET`. Web (`app.domain`) and API (`api.domain`) are
-  same-site, so Lax cookies flow on XHR while blocking cross-site POSTs (CSRF
-  baseline); the API additionally rejects mutations whose `Origin` header does
-  not match `APP_URL`.
-- Session id is regenerated on login (fixation defense). Logout deletes the
-  Redis key; disabling a user deletes every key in their index.
-- **The session only authenticates.** Roles, permissions, and data scope are
-  resolved per request (3.5 in `04`, and section 4 below), so an admin's
-  permission change applies within seconds, not at next login.
+- **Access token:** JWT (HS256, signed with `AUTH_SECRET`), TTL ~15 min. Claims
+  are minimal — `{ sub: userId, tid: tenantId }` plus standard `iat`/`exp` — and
+  are **identity only**. Roles, permissions and data scope are **not** in the
+  token; they are resolved from the DB per request (section 4.5), so an admin's
+  permission change or a user disable applies on the very next request, not at
+  next login.
+- **Refresh token:** JWT (HS256, same secret, distinct `typ: "refresh"` claim),
+  TTL ~7 days. Exchanged at `POST /auth/refresh` for a fresh access token after
+  re-checking the user is still `ACTIVE`. When it expires, the user logs in
+  again. No rotation/replay-tracking machinery in v1 (that needs server state,
+  which stateless JWT deliberately avoids); a low-traffic internal console does
+  not justify it.
+- **Transport:** both tokens are returned in the login/refresh **response body**;
+  the client sends the access token as `Authorization: Bearer <token>`. No
+  cookies, so **CSRF does not apply** and there is no origin check. Frontend
+  token storage (in-memory access token, refresh kept where the app chooses) is
+  a web-app concern (section 6), out of the API's scope.
+- **Logout is client-side:** the client discards its tokens. There is no
+  server-side session to delete. Hard invalidation of an *active* user is done
+  by disabling the account (section 4.5 status check), not by killing a token.
 
 ### 3.3 Login flow and the RLS chicken-and-egg
 
@@ -70,7 +97,8 @@ unbound connection sees zero rows, including `system_tenants`. The flow is:
    role). This is the one sanctioned use of the cross-tenant path in the normal
    request flow: a single indexed lookup, no user data.
 2. Everything else runs inside `withTenant(tenantId)`: load the user by email,
-   verify argon2id hash, write the login log, create the session.
+   verify argon2id hash, write the login log, then sign the access + refresh
+   tokens and return them.
 3. Unknown tenant code: log to the application log only (no tenant to attribute
    a DB row to), return the same generic `INVALID_CREDENTIALS` as a wrong
    password — never reveal whether a tenant or email exists.
@@ -80,16 +108,22 @@ unbound connection sees zero rows, including `system_tenants`. The flow is:
 - argon2id with library defaults; hash format stores its own parameters, so
   upgrades re-hash on next successful login.
 - Minimum 10 characters; no composition rules, no forced rotation.
-- Change-password requires the current password and destroys all other sessions.
+- Change-password requires the current password. With stateless JWT there is no
+  session to destroy; already-issued access tokens for the account remain valid
+  until they expire (~15 min). If a hard "sign out other devices on password
+  change" guarantee is needed later, it arrives with the token-denylist upgrade
+  noted in section 2, not before.
 - Reset in phase 1 is **admin-set temporary password** (flag
   `must_change_password`); email self-reset arrives with the notification
   channel, not before.
 
 ### 3.5 Throttling and login log
 
-- Login endpoint: rate-limited per IP and per `(tenantCode, email)`
-  (`@nestjs/throttler` + Redis). After 5 consecutive failures per account:
-  15-minute lockout; failures and lockouts are visible in the login log.
+- Login endpoint: rate-limited per IP and per `(tenantCode, email)` with
+  `@nestjs/throttler` (in-memory storage — the app runs as a single instance at
+  this scale; switch the throttler to a shared store if it is ever horizontally
+  scaled). After 5 consecutive failures per account: 15-minute lockout, tracked
+  on the user row; failures and lockouts are visible in the login log.
 - `system_login_logs`: tenant_id, user_id (nullable — unknown email), attempted
   email, ip, user agent, outcome (`SUCCESS`, `BAD_PASSWORD`, `LOCKED`,
   `DISABLED`), created_at. Append-only; this is `system`'s login-log ownership
@@ -149,28 +183,37 @@ possible upgrade; do not build it until a real customer needs it.
 
 ```txt
 requestId
-  -> sessionMiddleware        cookie -> Redis -> req.auth = { userId, tenantId }
+  -> jwtAuthMiddleware        Bearer token -> verify -> req.auth = { userId, tenantId }
     -> tenantContextMiddleware  resolve authz (4.5) -> TenantContext.run(scope)
-      -> AuthGuard / TenantGuard   fail closed; @Public() opts out
+      -> TenantGuard             fail closed; @Public() opts out
         -> PermissionsGuard        @RequirePermissions("finance:receivable:read")
                                    checks entitlement (module prefix) + permission
           -> handler
 ```
 
-Controllers declare permissions with `@RequirePermissions(...)`; a route without
-the decorator (and without `@Public()`) fails closed in review — lint/test
-asserts every route carries one of the two.
+`jwtAuthMiddleware` verifies the `Authorization: Bearer` access token's
+signature and expiry; a missing/invalid/expired token leaves `req.auth` unset
+and the guards reject it (`@Public()` routes — login, refresh, health — opt
+out). Controllers declare permissions with `@RequirePermissions(...)`; a route
+without the decorator (and without `@Public()`) fails closed in review —
+lint/test asserts every route carries one of the two.
 
-### 4.5 Authorization resolution and caching
+### 4.5 Authorization resolution
 
-Per request, from `userId + tenantId`:
+Per request, from the token's `userId + tenantId`:
 
-1. Load role ids -> permission keys, user's `data_scope_type` -> `branchIds`
+1. Re-check the user is still `ACTIVE` (a `DISABLED` user is rejected here — this
+   is what makes disabling take effect immediately without any session to kill).
+2. Load role ids -> permission keys, user's `data_scope_type` -> `branchIds`
    (`"ALL"` for TENANT, explicit list for BRANCH_SET, list + self-marker for SELF).
-2. Build `TenantScope { tenantId, userId, branchIds, permissions }`.
-3. Cache the resolved bundle in Redis (`authz:<tenantId>:<userId>`, TTL 60s),
-   invalidated eagerly on role/user/scope mutations. Worst case a revoked
-   permission lives 60 more seconds; a deleted session dies immediately.
+3. Build `TenantScope { tenantId, userId, branchIds, permissions }`.
+
+Resolution hits the DB every request. At this scale (a single center's staff,
+low request volume) that is cheap and keeps authorization strictly live — a
+revoked permission or a disabled user is enforced on the next request with no
+staleness window. No caching layer in v1; if request volume ever makes it worth
+it, a short-TTL cache with eager invalidation can be added here without changing
+the model.
 
 `SELF` scope interpretation is module-specific (own classes via teacher
 assignment, own leads via assigned staff) and is applied by repositories the
@@ -219,38 +262,45 @@ Dev seed: one tenant, one Owner user, both branches, all modules enabled.
 
 ## 6. Frontend Contract
 
-- `POST /api/v1/auth/login` `{ tenantCode, email, password }` -> sets cookie,
-  returns the same payload as `/auth/me`.
+- `POST /api/v1/auth/login` `{ tenantCode, email, password }` -> returns
+  `{ accessToken, refreshToken }` plus the same profile payload as `/auth/me`.
+- `POST /api/v1/auth/refresh` `{ refreshToken }` -> `{ accessToken }` (after
+  re-checking the user is still `ACTIVE`).
 - `GET /api/v1/auth/me` -> `{ user, tenant, branchScope, permissions[] }` —
-  the console boots from this single call.
+  the console boots from this single call, sending `Authorization: Bearer`.
 - Menu/sidebar visibility is a static frontend config keyed by permission
   (`"finance:receivable:read"` shows the receivables menu). No menu tables in v1.
-- `401` (no/expired session) -> redirect to login. `403` -> permission toast.
-  The frontend hides what users cannot do, but the API is the enforcement.
+- `401` (no/expired/invalid access token) -> try refresh once, else redirect to
+  login. `403` -> permission toast. The frontend hides what users cannot do, but
+  the API is the enforcement.
+- Token storage is a web-app concern: keep the access token in memory and the
+  refresh token wherever the app chooses (see `07-frontend-architecture.md`).
+  There are no auth cookies, so no CSRF handling is required on either side.
 
 ## 7. Platform Admin
 
 Platform operations (tenant provisioning, cross-tenant support) do not use
 tenant RBAC. Phase 1 keeps this deliberately minimal: a separate
 `platform_admins` credential table (no tenant_id, owner-role db path, its own
-login endpoint and session namespace) guarded to provisioning endpoints only.
-Every platform action is audit-logged with actor and reason
+login endpoint issuing a distinct token type) guarded to provisioning endpoints
+only. Every platform action is audit-logged with actor and reason
 (`04-tenancy-and-data-scope.md` section 9).
 
 ## 8. Testing Requirements
 
 1. Login: success, wrong password, unknown email, unknown tenant code — the
    last three return identical `INVALID_CREDENTIALS`; lockout after 5 failures.
-2. Session: logout kills access; disable-user kills all sessions; cookie
-   tampering fails signature check.
-3. Guards fail closed: no session -> 401; missing `@RequirePermissions` +
+2. Tokens: a valid access token authenticates; a tampered or expired token fails
+   verification (401); refresh mints a new access token; refresh for a now-
+   `DISABLED` user is refused.
+3. Guards fail closed: no/invalid token -> 401; missing `@RequirePermissions` +
    missing `@Public` -> rejected by the route-metadata test.
 4. Permission and entitlement: role without key -> 403; disabled module -> not
    found; `*` grants all.
 5. Data scope: BRANCH_SET user reads only scoped branches' rows (on top of the
    RLS tenant tests, which stay separate).
-6. Authz cache invalidation: revoking a role takes effect within TTL; eager
-   invalidation path takes effect immediately.
+6. Live authorization: revoking a role or disabling a user takes effect on the
+   user's next request (no cache TTL to wait out).
 
 ## 9. Out of Scope (revisit when needed)
 

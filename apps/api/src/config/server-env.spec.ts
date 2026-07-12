@@ -47,7 +47,7 @@ describe("parseServerEnv", () => {
 
   it("throws a readable error when required values are invalid", () => {
     expect(() => parseServerEnv({ AUTH_SECRET: "short" })).toThrow(
-      "Invalid server environment: DATABASE_URL: Invalid input: expected string, received undefined; REDIS_URL: Invalid input: expected string, received undefined; AUTH_SECRET: Too small: expected string to have >=16 characters",
+      "Invalid server environment: DATABASE_URL: Invalid input: expected string, received undefined; AUTH_SECRET: Too small: expected string to have >=16 characters",
     );
   });
 });

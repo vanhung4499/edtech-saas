@@ -2,11 +2,9 @@ import "reflect-metadata";
 import { ValidationPipe, VersioningType } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
-import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
-import { createOriginCheckMiddleware } from "./common/auth/origin-check.middleware";
-import { createSessionMiddleware } from "./common/auth/session.middleware";
-import { SessionStore } from "./common/auth/session.store";
+import { createJwtAuthMiddleware } from "./common/auth/jwt-auth.middleware";
+import { TokenService } from "./common/auth/token.service";
 import { AppExceptionFilter } from "./common/exceptions/app-exception.filter";
 import { setupOpenApi } from "./common/openapi/setup-openapi";
 import { createValidationException } from "./common/pipes/validation-exception.factory";
@@ -19,25 +17,21 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get<ConfigService<ServerEnv, true>>(ConfigService);
   const appUrl = config.get("APP_URL", { infer: true });
-  const authSecret = config.get("AUTH_SECRET", { infer: true });
   const port = config.get("PORT", { infer: true });
-  const sessionStore = app.get(SessionStore);
+  const tokenService = app.get(TokenService);
 
   app.setGlobalPrefix("api");
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: "1",
   });
-  app.enableCors({
-    origin: appUrl,
-    credentials: true,
-  });
+  // Bearer-token auth carries no cookies, so no credentials mode / CSRF concern
+  // — CORS just needs to allow the web app's origin and its Authorization header.
+  app.enableCors({ origin: appUrl });
   // Pipeline order matches 09-auth-and-authorization.md §4.4: requestId ->
-  // origin check -> cookie parsing -> session -> tenant context -> ... .
+  // jwtAuth (Bearer -> req.auth) -> tenant context -> request logging.
   app.use(requestIdMiddleware);
-  app.use(createOriginCheckMiddleware(appUrl));
-  app.use(cookieParser(authSecret));
-  app.use(createSessionMiddleware(sessionStore));
+  app.use(createJwtAuthMiddleware(tokenService));
   app.use(tenantContextMiddleware);
   app.use(requestLoggingMiddleware);
   app.useGlobalPipes(

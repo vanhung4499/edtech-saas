@@ -1,8 +1,10 @@
 import { Injectable, type NestMiddleware } from "@nestjs/common";
 import { TenantContext, type TenantScope } from "./tenant-context";
 
-// Set by session.middleware.ts from a verified session — never from a raw
-// client header or query param (04-tenancy-and-data-scope.md §5 rule 1).
+// Set by jwt-auth.middleware.ts from a verified access token — never from a raw
+// client header or query param (04-tenancy-and-data-scope.md §5 rule 1). Carries
+// identity only; roles/permissions/scope are resolved from the DB per request
+// (09-auth §4.5), not read off the token.
 export interface AuthClaims {
   tenantId: string;
   userId: string;

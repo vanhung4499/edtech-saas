@@ -7,8 +7,10 @@ export const serverEnvSchema = z.object({
   API_URL: z.string().url().default("http://localhost:3001"),
   DATABASE_URL: z.string().url(),
   DATABASE_MIGRATE_URL: z.string().url().optional(),
-  // Required from auth-rbac plan step 3: sessions live in Redis.
-  REDIS_URL: z.string().url(),
+  // Optional: not on the auth path (auth is stateless JWT). Reserved for BullMQ
+  // when background jobs are wired — required then, not now.
+  REDIS_URL: z.string().url().optional(),
+  // JWT signing key (HS256) for access + refresh tokens (09-auth §3.2).
   AUTH_SECRET: z.string().min(16),
 });
 

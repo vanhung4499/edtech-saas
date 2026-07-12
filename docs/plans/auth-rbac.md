@@ -2,7 +2,7 @@
 
 | Field        | Value                                                      |
 | ------------ | ----------------------------------------------------------- |
-| Status       | In progress — step 2 of 9 done                             |
+| Status       | In progress — step 3 of 9 done (auth = stateless JWT + Bearer) |
 | Date         | 2026-07-06                                                 |
 | Scope        | Implement `docs/technical/09-auth-and-authorization.md`    |
 | Depends on   | `docs/plans/tenant-isolation.md` (steps 1–5 must be done)  |
@@ -22,9 +22,10 @@ default. This completes the remaining exit criteria of roadmap Phase 1.
   cross-tenant path) — if the tenant plan did not create it, it is created in
   step 3 here for the tenant-code lookup.
 
-New dependencies to add in `apps/api`: `argon2`, `ioredis`, `cookie-parser`,
-`@nestjs/throttler`. New env: `REDIS_URL` becomes required for the api
-(already in `.env.example`), `AUTH_SECRET` already exists.
+New dependencies to add in `apps/api`: `argon2`, `@nestjs/jwt`,
+`@nestjs/throttler`. `AUTH_SECRET` (already present) is the JWT signing key.
+No Redis, cookie, or session dependency: auth is stateless `Bearer`-token JWT
+(design doc §2/§3.2), so `REDIS_URL` stays optional and is not on the auth path.
 
 ## 3. Work Breakdown
 
@@ -92,104 +93,85 @@ typo'd key is a compile error, not a silent always-false check. `@Public()`
 already existed from the tenant-isolation plan (step 5), reused as-is.
 Registry unit test covers key shape, known-module prefixes, no duplicates.
 
-### Step 3: Session infrastructure
+### Step 3: Token infrastructure (stateless JWT)
 
-- `apps/api/src/common/auth/session.store.ts`: Redis-backed store
-  (create/get/touch/destroy/destroyAllForUser), sliding TTL 12h, absolute 7d,
-  `user-sessions:<tenantId>:<userId>` index.
-- Signed cookie handling (`cookie-parser` + `AUTH_SECRET`), cookie name
-  `edtech_session`, httpOnly, SameSite=Lax, Secure in prod.
-- `session.middleware.ts`: cookie -> store -> `req.auth = { userId, tenantId }`;
-  invalid/expired -> clears cookie, leaves `req.auth` unset (guards decide).
-- Origin check for mutating methods against `APP_URL`.
-- Platform db handle (`db.platform.ts`, owner role) if not already present.
+Stateless `Bearer`-token JWT — no session store, no Redis, no cookies on the
+auth path (design doc §2/§3.2). Superseded the earlier Redis-session design
+(see the pivot note below).
 
-Done: unit tests on store TTL/index behavior with a real Redis from compose.
+- `apps/api/src/common/auth/token.service.ts`: signs/verifies the access token
+  (~15 min, claims `{ sub: userId, tid: tenantId }`) and refresh token (~7 days,
+  `typ: "refresh"`), both HS256 over `AUTH_SECRET` via `@nestjs/jwt`. Identity
+  only — no roles/permissions in the token.
+- `apps/api/src/common/auth/jwt-auth.middleware.ts`: reads
+  `Authorization: Bearer`, verifies the access token, sets
+  `req.auth = { userId, tenantId }`; missing/invalid/expired -> leaves `req.auth`
+  unset (guards reject). Runs before `tenantContextMiddleware`.
+- Platform db handle (`db.platform.ts`, owner role) — kept from the earlier
+  design; the login tenant-code lookup still needs it.
+- Pipeline in `main.ts`: `requestId` -> `jwtAuth` -> tenant context -> request
+  logging. No cookie-parser, no origin check (Bearer -> CSRF N/A).
 
-**Status: done.** `common/redis/` (new, sibling to `common/database/`) holds
-`redis.provider.ts` (`REDIS` token, `ioredis` client from `REDIS_URL`) and a
-`@Global()` `RedisModule` — kept separate from auth on purpose, since Redis is
-an infra dependency other modules may need later, not an auth-only concern.
-`common/auth/session.store.ts` is a thin `SessionStore` over it: sliding TTL
-12h, absolute cap 7d (`touch()` refuses to extend past the absolute lifetime
-and destroys the session if the cap has already passed), plus a
-`user-sessions:<tenantId>:<userId>` index set for `destroyAllForUser()`. 7
-tests against a real Redis (via compose), including the absolute-cap and
-destroy-on-expired-cap paths using a manually backdated `createdAt`.
-`common/auth/auth-infrastructure.module.ts` now just provides/exports
-`SessionStore`, relying on the globally available `REDIS` token.
+Done: unit tests on token sign/verify (valid round-trip, tampered/expired
+rejected, access-vs-refresh type separation).
 
-`session.middleware.ts` reads the signed `edtech_session` cookie
-(`cookie-parser` + `AUTH_SECRET`), touches the store, and sets
-`req.auth = { userId, tenantId }`; a missing/invalid/tampered cookie clears
-the cookie and leaves `req.auth` unset for guards to reject downstream.
-`origin-check.middleware.ts` rejects mutating requests (POST/PUT/PATCH/DELETE)
-whose `Origin` doesn't exactly match `APP_URL`. `db.platform.ts` adds
-`PLATFORM_DB` (owner-role client off `DATABASE_MIGRATE_URL`, RLS-bypassing,
-exported raw) for the narrow cross-tenant paths documented in
-`04-tenancy-and-data-scope.md` §9. Pipeline order in `main.ts`: `requestId` ->
-origin check -> `cookieParser` -> session -> tenant context -> request
-logging.
+**Status: done (redesigned).** Originally built as Redis-backed sessions +
+signed cookie (committed `5596f7c`); the team then chose standard stateless
+JWT + `Bearer` as simpler and sufficient for a low-traffic internal console,
+and this step was rebuilt. Removed: `session.store.ts`(+spec),
+`session.middleware.ts`, `origin-check.middleware.ts`,
+`auth-infrastructure.module.ts`, `common/redis/`, and the `cookie-parser` /
+`ioredis` deps; `REDIS_URL` went back to optional. Added: `@nestjs/jwt`,
+`token.service.ts` (+spec), `jwt-auth.middleware.ts`. Kept: `db.platform.ts`,
+`tenant-context.middleware`, `TenantGuard`, and the Step 2 permission registry.
+`AuthClaims` trimmed to `{ tenantId, userId }`. Live-verified: login mints a
+token, `Bearer` reaches a guarded route and populates `TenantContext`, a
+tampered/expired token is rejected 401. Full monorepo
+`typecheck && lint && test && build` green.
 
-Found and fixed a real bug during live verification: both `session.middleware.ts`
-and `origin-check.middleware.ts` run as plain `app.use()` Express middleware,
-which sits **outside** Nest's `useGlobalFilters()` pipeline — confirmed
-empirically that an uncaught error there reaches Express's default handler
-instead of `AppExceptionFilter`, leaking raw internals (a corrupted session
-value's `JSON.parse` error came through verbatim to the client). Fixed by
-wrapping `sessionStore.touch()` in try/catch: log the real error server-side
-via `Logger` (traceId + stack) and hand-construct the same safe
-`{code, message, data, traceId}` 500 envelope `AppExceptionFilter` would
-produce. Re-verified with a clean process restart: client gets the safe
-response, server log has the full stack trace.
-
-Live-verified end-to-end against real Postgres + Redis (temporary smoke routes
-in `health.controller.ts`, reverted after): public health route unaffected;
-origin check 403s on a mismatched `Origin` and passes on a matching one;
-unauthenticated `whoami` 401s via `TenantGuard`; session creation -> signed
-cookie -> `whoami` correctly populates `req.auth` and `TenantContext`; a
-tampered cookie is rejected and cleared. Full monorepo
-`typecheck && lint && test && build` green (33/33 tests).
-
-### Step 4: Auth module (login/logout/me/change-password)
+### Step 4: Auth module (login/refresh/me/change-password)
 
 `apps/api/src/modules/system/auth/` (light module):
 
-- `POST /api/v1/auth/login` — flow from design doc 3.3: tenant-code lookup on
+- `POST /api/v1/auth/login` — flow from design doc §3.3: tenant-code lookup on
   the platform handle, then `withTenant`: user lookup, argon2 verify (re-hash on
-  parameter drift), lockout check, login log write, session create (regenerated
-  id), cookie set. Uniform `INVALID_CREDENTIALS` for unknown
-  tenant/email/password.
-- `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`,
-  `POST /api/v1/auth/change-password` (current password required; destroys
-  other sessions; clears `must_change_password`).
-- Throttling: `@nestjs/throttler` per-IP on `/auth/login` + per-account
-  failure counter in Redis (5 fails -> 15 min lock, outcome `LOCKED` logged).
+  parameter drift), lockout check, login log write, then sign + return
+  `{ accessToken, refreshToken }` with the `/auth/me` profile. Uniform
+  `INVALID_CREDENTIALS` for unknown tenant/email/password.
+- `POST /api/v1/auth/refresh` (verify refresh token -> re-check user `ACTIVE` ->
+  new access token), `GET /api/v1/auth/me`, `POST /api/v1/auth/change-password`
+  (current password required; clears `must_change_password`). Logout is
+  client-side (discard tokens) — no server endpoint needed.
+- Throttling: `@nestjs/throttler` per-IP on `/auth/login` (in-memory store) +
+  per-account failure counter/lockout tracked on the user row (5 fails -> 15 min
+  lock, outcome `LOCKED` logged).
 
 Done: e2e-style specs for the four endpoints against real Postgres+Redis.
 
 ### Step 5: Guards + authorization resolution
 
 - `authz.resolver.ts`: `userId+tenantId` -> `{ permissions, branchIds, scopeType }`
-  from roles/user-branches, Redis cache `authz:<tenantId>:<userId>` TTL 60s,
-  eager invalidation hooks exported for step 6 mutations.
+  from roles/user-branches, re-checking the user is still `ACTIVE`. Resolves
+  from the DB every request — no cache in v1 (low-traffic internal console;
+  keeps authorization strictly live, design doc §4.5).
 - Extend `tenantContextMiddleware`: when `req.auth` exists, resolve authz and
   populate the full `TenantScope` (until now it only carried ids).
 - `PermissionsGuard`: reads `@RequirePermissions` metadata; checks module
-  entitlement (prefix -> `system_module_entitlements`, cached with authz bundle),
-  then permission (`*` honored). Disabled module -> `AppException.notFound`.
+  entitlement (prefix -> `system_module_entitlements`), then permission
+  (`*` honored). Disabled module -> `AppException.notFound`.
 - Route-metadata conformance test: every registered route has
   `@RequirePermissions` or `@Public` (reflection over the router) — this
   is the "fail closed in review" enforcement.
 
-Done: guard test matrix (no session / no permission / disabled module / `*`).
+Done: guard test matrix (no token / no permission / disabled module / `*`).
 
 ### Step 6: System management endpoints (minimum to operate)
 
 Light-module CRUD under `/api/v1/system/`, all permission-guarded:
 
 - users: create (temp password + `must_change_password`), list, disable/enable
-  (disable destroys sessions), set data scope + branches, assign roles
+  (disable takes effect on the user's next request via the §4.5 status check),
+  set data scope + branches, assign roles
 - roles: CRUD + set permissions (validated against the registry; `is_system`
   protected)
 - module entitlements: list only (`system:module-entitlement:read`) — enabling
@@ -197,7 +179,8 @@ Light-module CRUD under `/api/v1/system/`, all permission-guarded:
   tenant self-service action; it happens via the platform admin path (step 9),
   not this endpoint
 
-Every mutation calls the authz cache invalidation from step 5.
+Authorization is resolved live from the DB per request (step 5), so mutations
+here need no cache-invalidation step — the next request already sees the change.
 
 Done: an Owner can create a BRANCH_SET user via API and that user's `/auth/me`
 shows the reduced scope; revocation applies immediately.
@@ -220,9 +203,11 @@ out-of-scope `branchId` returns 403 (tests).
 ### Step 8: Web login slice
 
 `apps/web`: login page (tenantCode/email/password, RHF+zod), shared fetch layer
-(`credentials: "include"`, envelope unwrap, 401 -> redirect), auth provider
-booting from `/auth/me`, guarded app shell, logout. Menu visibility keyed by
-permissions from `/auth/me` (static config).
+(attaches `Authorization: Bearer`, envelope unwrap, 401 -> refresh-once-then-
+redirect), auth provider booting from `/auth/me`, guarded app shell, logout
+(discard tokens). Menu visibility keyed by permissions from `/auth/me` (static
+config). Token storage per design doc §6 (access in memory, refresh per app
+choice).
 
 Done: manual flow — login as seeded Owner, see shell, logout; wrong password
 shows uniform error.
